@@ -39,7 +39,40 @@
             margin-top: 2px;
             font-weight: 600;
         }
+        .wakeup-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 10px;
+            border-radius: 999px;
+            background: var(--SmartThemeBlurTintColor, rgba(128,128,128,.15));
+        }
+        .wakeup-cmd-row { display: flex; gap: 6px; align-items: stretch; }
+        .wakeup-cmd-row input { flex: 1; font-size: 10px; font-family: monospace; }
+        .wakeup-copy-btn { flex-shrink: 0; white-space: nowrap; }
     </style>
+
+    <div class="wakeup-card">
+        <h5>部署状态
+            <span id="wakeup-bridge-status" class="wakeup-status">检测中…</span>
+        </h5>
+        <label for="wakeup-deploy-cmd">第一步 · 在 Termux 里运行一次（自动部署全部脚本）</label>
+        <div class="wakeup-cmd-row">
+            <input id="wakeup-deploy-cmd" type="text" readonly>
+            <button id="wakeup-copy-cmd" class="menu_button wakeup-copy-btn">复制</button>
+        </div>
+        <div class="wakeup-hint">酒馆装在其他路径就把前面的路径换成实际的（一般在 ~/SillyTavern）。部署完点一次「保存设置」就会同步配置。</div>
+    </div>
+
+    <div class="wakeup-card">
+        <h5>AI API 配置（生成早安回复用）</h5>
+        <label for="wakeup-api-base">API 地址</label>
+        <input id="wakeup-api-base" type="text" placeholder="https://api.openai.com/v1">
+        <label for="wakeup-api-model">模型名</label>
+        <input id="wakeup-api-model" type="text" placeholder="gpt-4o-mini">
+        <label for="wakeup-ai-key">API Key</label>
+        <input id="wakeup-ai-key" type="text" placeholder="sk-...">
+        <div class="wakeup-hint">和你在酒馆里用同一个服务商即可（OpenAI / DeepSeek / 硅基流动 / 智谱等）。保存后自动同步到 Termux，不用改任何脚本文件。</div>
+    </div>
 
     <div class="wakeup-card">
         <h5>连接 · Termux 桥</h5>
@@ -48,14 +81,14 @@
         <div class="wakeup-row">
             <div style="flex:1;">
                 <label for="wakeup-bridge-key">桥接密钥</label>
-                <input id="wakeup-bridge-key" type="text" placeholder="与 bridge.py 的 KEY 一致">
+                <input id="wakeup-bridge-key" type="text" placeholder="wake-2026">
             </div>
             <div style="flex:1;">
                 <label for="wakeup-api-key">注入端点密钥</label>
-                <input id="wakeup-api-key" type="text" placeholder="与 wake_job.sh 的 API_KEY 一致">
+                <input id="wakeup-api-key" type="text" placeholder="wake-2026">
             </div>
         </div>
-        <div class="wakeup-hint">两端密钥需一致，防止本地其他程序误调用。</div>
+        <div class="wakeup-hint">两个密钥默认 wake-2026，正式使用请改成自己的，保存后自动同步到 Termux。</div>
     </div>
 
     <div class="wakeup-card">
@@ -66,6 +99,7 @@
             <label for="wakeup-minute" style="margin:0;">分</label>
             <input id="wakeup-minute" type="number" min="0" max="59">
         </div>
+        <div class="wakeup-hint">也可以说「明天7点叫醒我」「十五分钟后提醒我」等任意时间。</div>
     </div>
 
     <div class="wakeup-card">

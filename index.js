@@ -23,8 +23,11 @@ import { app } from "../../../server.js";
 // ---------- 默认设置（可在酒馆扩展设置面板里改）----------
 const defaultSettings = {
     bridgeUrl: "http://127.0.0.1:8765",   // Termux 桥接服务地址
-    bridgeKey: "wake-2026",               // 桥接密钥（与 bridge.py 中 KEY 一致）
-    apiKey: "wake-2026",                  // 注入端点密钥（与 wake_job.sh 中 API_KEY 一致）
+    bridgeKey: "wake-2026",               // 桥接密钥（自动同步到 Termux 配置）
+    apiKey: "wake-2026",                  // 酒馆注入端点密钥（自动同步）
+    apiBase: "https://api.openai.com/v1", // AI API 地址（自动同步给 morning.py）
+    apiModel: "gpt-4o-mini",              // 模型名
+    aiApiKey: "",                         // AI API Key
     defaultHour: 8,                       // 只说「晚安」时的默认叫醒时间
     defaultMinute: 0,
     confirmInject: true,                  // 操作后是否在聊天里注入系统消息
@@ -156,6 +159,39 @@ async function cancelAlarm() {
     }
 }
 
+// ---------- 配置同步：把密钥 + AI API 配置写到 Termux ----------
+async function syncConfig() {
+    try {
+        const body = {
+            bridge_key: settings.bridgeKey,
+            api_wake_key: settings.apiKey,
+            api_base: settings.apiBase,
+            api_key: settings.aiApiKey,
+            model: settings.apiModel,
+        };
+        const res = await fetch(`${settings.bridgeUrl}/config?key=${encodeURIComponent(settings.bridgeKey)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) console.error("[WakeUp] 配置同步失败:", res.status);
+        return res.ok;
+    } catch (e) {
+        console.error("[WakeUp] 配置同步失败（桥未运行？）:", e);
+        return false;
+    }
+}
+
+// ---------- 桥健康检查 ----------
+async function checkBridge() {
+    try {
+        const res = await fetch(`${settings.bridgeUrl}/ping`, { method: "GET" });
+        return res.ok;
+    } catch (e) {
+        return false;
+    }
+}
+
 // ---------- 把角色人格 + 最近聊天缓存到手机（供早上离线生成回复）----------
 async function sendRoleCache() {
     try {
@@ -251,6 +287,9 @@ jQuery(async () => {
     $("#wakeup-bridge-url").val(settings.bridgeUrl);
     $("#wakeup-bridge-key").val(settings.bridgeKey);
     $("#wakeup-api-key").val(settings.apiKey);
+    $("#wakeup-api-base").val(settings.apiBase);
+    $("#wakeup-api-model").val(settings.apiModel);
+    $("#wakeup-ai-key").val(settings.aiApiKey);
     $("#wakeup-hour").val(settings.defaultHour);
     $("#wakeup-minute").val(settings.defaultMinute);
     $("#wakeup-confirm").prop("checked", settings.confirmInject);
@@ -260,10 +299,35 @@ jQuery(async () => {
     $("#wakeup-mode").val(settings.mode);
     $("#wakeup-whitelist").val(settings.whitelist.join(", "));
 
-    $("#wakeup-save").on("click", () => {
+    // 部署命令显示
+    $("#wakeup-deploy-cmd").val("bash ~/SillyTavern/data/default-user/extensions/wake-up-call/setup.sh");
+
+    // 桥状态检测
+    checkBridge().then(ok => {
+        const el = $("#wakeup-bridge-status");
+        if (el.length) {
+            el.text(ok ? "● 桥已连接" : "○ 桥未连接（请在 Termux 运行部署命令）");
+            el.css("color", ok ? "#3fb950" : "#f85149");
+        }
+    });
+
+    $("#wakeup-copy-cmd").on("click", async () => {
+        const cmd = $("#wakeup-deploy-cmd").val();
+        try {
+            await navigator.clipboard.writeText(cmd);
+            if (typeof toastr !== "undefined") toastr.success("部署命令已复制，去 Termux 粘贴运行");
+        } catch (e) {
+            console.error("[WakeUp] 复制失败:", e);
+        }
+    });
+
+    $("#wakeup-save").on("click", async () => {
         settings.bridgeUrl = $("#wakeup-bridge-url").val().trim() || defaultSettings.bridgeUrl;
         settings.bridgeKey = $("#wakeup-bridge-key").val().trim() || defaultSettings.bridgeKey;
         settings.apiKey = $("#wakeup-api-key").val().trim() || defaultSettings.apiKey;
+        settings.apiBase = $("#wakeup-api-base").val().trim() || defaultSettings.apiBase;
+        settings.apiModel = $("#wakeup-api-model").val().trim() || defaultSettings.apiModel;
+        settings.aiApiKey = $("#wakeup-ai-key").val().trim();
         settings.defaultHour = Math.min(23, Math.max(0, parseInt($("#wakeup-hour").val(), 10) || 8));
         settings.defaultMinute = Math.min(59, Math.max(0, parseInt($("#wakeup-minute").val(), 10) || 0));
         settings.confirmInject = $("#wakeup-confirm").is(":checked");
@@ -275,7 +339,10 @@ jQuery(async () => {
             .split(/[,，]/).map(s => s.trim()).filter(Boolean);
         extension_settings.wakeup = settings;
         saveSettingsDebounced();
-        if (typeof toastr !== "undefined") toastr.success("Wake-Up 设置已保存");
+        const synced = await syncConfig();
+        if (typeof toastr !== "undefined") {
+            toastr.success(synced ? "设置已保存并同步到 Termux" : "设置已保存（桥未连接，部署后请再点保存）");
+        }
     });
 
     eventSource.on(event_types.MESSAGE_SENT, handleUserMessage);

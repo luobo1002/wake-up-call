@@ -1,19 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ============================================================
-#  wake_dialog.sh — 独立设闹钟弹窗（不打开酒馆）
+#  wake_dialog.sh — 独立设提醒弹窗（不打开酒馆）
 #  ------------------------------------------------------------
-#  用法：运行后弹出系统时间选择器，选好时间即设定叫醒闹钟
-#        （复用 bridge.py 的 /schedule 逻辑：系统闹钟 + 定时任务）
+#  用法：运行后弹出系统时间选择器，选好时间即设定提醒
 #  桌面快捷方式（推荐）：
-#     1) 把本文件放进 ~/.shortcuts/
-#        （pkg install termux-api termux-widget 之后）
-#     2) chmod +x ~/.shortcuts/wake_dialog.sh
-#     3) 长按手机桌面 → 添加小部件 → Termux:Widget → 选本脚本
-#     之后在桌面点一下图标，就直接弹出时间选择器。
-#  依赖：bridge.py 正在运行（nohup python3 bridge.py &）
+#     1) 放在 ~/.shortcuts/（setup.sh 会自动部署）
+#     2) 长按手机桌面 → 添加小部件 → Termux:Widget → 选本脚本
+#  依赖：wake_bridge.py 正在运行
 # ============================================================
 
-KEY="wake-2026"                          # 与 bridge.py 的 KEY 一致
+# 密钥从 ~/wakeup_config.json 读取（酒馆扩展设置里统一管理）
+KEY=$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/wakeup_config.json"))).get("bridge_key","wake-2026"))' 2>/dev/null || echo "wake-2026")
 BRIDGE="http://127.0.0.1:8765"
 
 # 弹出时间选择器（默认 08:00）

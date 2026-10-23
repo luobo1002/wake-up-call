@@ -5,13 +5,12 @@
 #  2) termux-notification 弹普通通知（标题=角色名，内容=角色的话）
 #  3) 可选：回调酒馆注入系统消息（酒馆没开也会写进记录）
 #  ------------------------------------------------------------
-#  放置位置：~/bin/wake_job.sh
-#  权限：chmod +x ~/bin/wake_job.sh
-#  注意：morning.py 放 ~/morning.py；API 配置在 morning.py 顶部
+#  放置位置：~/bin/wake_job.sh（由 setup.sh 自动部署，无需手动）
 # ============================================================
 
 API_URL="http://127.0.0.1:8000/api/wake-up"
-API_KEY="wake-2026"                       # 与酒馆扩展里的 apiKey 一致
+# 注入端点密钥从 ~/wakeup_config.json 读取（酒馆扩展设置里统一管理）
+API_KEY=$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/wakeup_config.json"))).get("api_wake_key","wake-2026"))' 2>/dev/null || echo "wake-2026")
 TEXT="【系统】主人已在闹钟时间醒来，新的一天开始咯～"
 
 # 1) 生成角色早安回复（调 AI API，不打开酒馆）

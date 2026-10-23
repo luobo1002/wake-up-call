@@ -6,28 +6,45 @@
 #        最近聊天）→ 构造提示词 → 调 OpenAI 兼容 API 生成
 #        一句角色早安回复 → 打印到 stdout（由 wake_job.sh 弹窗）
 #  ------------------------------------------------------------
-#  配置：改下面 CONFIG 里的 api_base / api_key / model
+#  AI API 配置：不用改本文件！
+#    在酒馆扩展设置面板里填 api_base / api_key / model，
+#    点保存会自动同步到 ~/wakeup_config.json，本脚本启动时读取。
 #  常见 OpenAI 兼容服务商：
 #    OpenAI   https://api.openai.com/v1         gpt-4o-mini
 #    DeepSeek https://api.deepseek.com/v1       deepseek-chat
 #    硅基流动 https://api.siliconflow.cn/v1     填你的模型名
 #    智谱     https://open.bigmodel.cn/api/paas/v4  glm-4-flash
-#  （和你在酒馆里用的同一个服务商即可）
 # ============================================================
 import json
 import os
 import urllib.request
 import datetime
 
-CONFIG = {
-    "api_base": "https://api.openai.com/v1",   # 换成你的 API 地址
-    "api_key": "sk-xxxxxxxx",                  # 换成你的 API Key
-    "model": "gpt-4o-mini",                    # 换成你的模型名
+CONFIG_FILE = os.path.expanduser("~/wakeup_config.json")
+CACHE_FILE = os.path.expanduser("~/wakeup_cache.json")
+
+# 默认值（配置同步前也能跑；酒馆设置面板保存后覆盖）
+FALLBACK = {
+    "api_base": "https://api.openai.com/v1",
+    "api_key": "",
+    "model": "gpt-4o-mini",
     "max_tokens": 200,
     "temperature": 0.9,
 }
 
-CACHE_FILE = os.path.expanduser("~/wakeup_cache.json")
+
+def load_config():
+    cfg = dict(FALLBACK)
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            for k in ("api_base", "api_key", "model"):
+                if data.get(k):
+                    cfg[k] = data[k]
+    except Exception:
+        pass
+    return cfg
 
 
 def load_cache():
@@ -72,19 +89,22 @@ def build_messages(cache):
 
 
 def call_api(messages):
-    url = CONFIG["api_base"].rstrip("/") + "/chat/completions"
+    cfg = load_config()
+    if not cfg["api_key"]:
+        return "早安～（请先在酒馆扩展设置里填好 AI API 配置）"
+    url = cfg["api_base"].rstrip("/") + "/chat/completions"
     body = json.dumps({
-        "model": CONFIG["model"],
+        "model": cfg["model"],
         "messages": messages,
-        "max_tokens": CONFIG["max_tokens"],
-        "temperature": CONFIG["temperature"],
+        "max_tokens": cfg["max_tokens"],
+        "temperature": cfg["temperature"],
     }).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {CONFIG['api_key']}",
+            "Authorization": f"Bearer {cfg['api_key']}",
         },
     )
     with urllib.request.urlopen(req, timeout=30) as r:
