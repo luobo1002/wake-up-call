@@ -281,6 +281,90 @@ async function consumeWakeEvent() {
     }
 }
 
+// ---------- 酒馆顶栏图标：点击弹出提醒设置浮层 ----------
+function buildWakePanel() {
+    $("#wakeup-panel").remove();
+    const $panel = $(`
+<div id="wakeup-panel" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);">
+  <div style="width:300px;max-width:88vw;border-radius:14px;padding:18px 20px;background:var(--SmartThemeBlurTintColor,#222);border:1px solid var(--SmartThemeBorderColor,#555);box-shadow:0 10px 40px rgba(0,0,0,.5);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <b style="font-size:15px;">⏰ Wake-Up 提醒</b>
+      <button id="wakeup-panel-close" class="menu_button" style="padding:2px 8px;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <button class="wakeup-quick menu_button" data-min="15">15分钟后</button>
+      <button class="wakeup-quick menu_button" data-min="30">30分钟后</button>
+      <button class="wakeup-quick menu_button" data-min="60">1小时后</button>
+      <button class="wakeup-quick menu_button" data-tomorrow="1">明天早上8点</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+      <input id="wakeup-panel-time" type="time" value="08:00" style="flex:1;">
+      <button id="wakeup-panel-custom" class="menu_button">自定义</button>
+    </div>
+    <button id="wakeup-panel-cancel" class="menu_button" style="width:100%;margin-bottom:6px;">取消提醒</button>
+    <div id="wakeup-panel-msg" style="font-size:11px;opacity:.7;min-height:14px;"></div>
+  </div>
+</div>`);
+    $panel.on("click", function (e) { if (e.target === this) closeWakePanel(); });
+    $panel.find("#wakeup-panel-close").on("click", closeWakePanel);
+    $panel.find(".wakeup-quick").on("click", function () {
+        const min = $(this).attr("data-min");
+        if (min) {
+            const ts = Date.now() + parseInt(min, 10) * 60000;
+            const label = `${min}分钟后`;
+            scheduleAlarm(ts, label);
+            showWakeMsg(`已设置 ${label} 提醒`);
+        } else {
+            const now = new Date();
+            const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, settings.defaultHour, settings.defaultMinute, 0, 0);
+            const label = `明天 ${String(settings.defaultHour).padStart(2, "0")}:${String(settings.defaultMinute).padStart(2, "0")}`;
+            scheduleAlarm(dt.getTime(), label);
+            showWakeMsg(`已设置 ${label} 提醒`);
+        }
+    });
+    $panel.find("#wakeup-panel-custom").on("click", function () {
+        const v = $("#wakeup-panel-time").val();
+        if (!v) return showWakeMsg("请先选择时间");
+        const [h, m] = v.split(":").map(Number);
+        const now = new Date();
+        const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+        if (dt.getTime() <= now.getTime()) dt.setDate(dt.getDate() + 1);
+        const label = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+        scheduleAlarm(dt.getTime(), label);
+        showWakeMsg(`已设置 ${label} 提醒`);
+    });
+    $panel.find("#wakeup-panel-cancel").on("click", function () {
+        cancelAlarm();
+        showWakeMsg("已取消提醒");
+    });
+    $("body").append($panel);
+    return $panel;
+}
+
+function openWakePanel() {
+    const $panel = buildWakePanel();
+    $panel.find("#wakeup-panel-time").val(
+        String(settings.defaultHour).padStart(2, "0") + ":" + String(settings.defaultMinute).padStart(2, "0")
+    );
+    $panel.find("#wakeup-panel-msg").text(settings.mode === "off" ? "当前生效范围=停用，这里仍可手动设置提醒" : "");
+}
+
+function closeWakePanel() {
+    $("#wakeup-panel").remove();
+}
+
+function showWakeMsg(text) {
+    $("#wakeup-panel-msg").text(text);
+}
+
+function addTopBarButton() {
+    if ($("#wakeup-topbar-btn").length) return;
+    const $btn = $('<div id="wakeup-topbar-btn" class="topbar_button" title="Wake-Up 提醒：快捷设置提醒时间" style="font-size:16px;line-height:1;">⏰</div>');
+    $btn.on("click", openWakePanel);
+    const bar = $("#top-bar, .topBar, #top-bar-holder").first();
+    if (bar.length) bar.append($btn);
+}
+
 // ---------- 设置面板 ----------
 jQuery(async () => {
     if (extension_settings.wakeup) {
@@ -356,4 +440,7 @@ jQuery(async () => {
     });
 
     eventSource.on(event_types.MESSAGE_SENT, handleUserMessage);
+
+    // 酒馆顶栏图标（⏰）
+    addTopBarButton();
 });
