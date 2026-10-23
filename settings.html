@@ -1,0 +1,98 @@
+<div class="wakeup-settings">
+    <style>
+        .wakeup-settings { display: flex; flex-direction: column; gap: 10px; }
+        .wakeup-card {
+            border: 1px solid var(--SmartThemeBorderColor, rgba(128,128,128,.35));
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: var(--SmartThemeBlurTintColor, rgba(0,0,0,.18));
+        }
+        .wakeup-card h5 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--SmartThemeBodyColor, inherit);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: .3px;
+        }
+        .wakeup-card label {
+            display: block;
+            font-size: 11px;
+            line-height: 1.4;
+            color: var(--SmartThemeBodyColor, inherit);
+            opacity: .78;
+            margin: 8px 0 3px;
+        }
+        .wakeup-card input[type=text],
+        .wakeup-card input[type=number],
+        .wakeup-card select {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .wakeup-card input[type=number] { width: 70px; }
+        .wakeup-row { display: flex; align-items: center; gap: 8px; }
+        .wakeup-hint { font-size: 10px; opacity: .6; line-height: 1.4; margin-top: 2px; }
+        .wakeup-save {
+            width: 100%;
+            margin-top: 2px;
+            font-weight: 600;
+        }
+    </style>
+
+    <div class="wakeup-card">
+        <h5>连接 · Termux 桥</h5>
+        <label for="wakeup-bridge-url">桥地址</label>
+        <input id="wakeup-bridge-url" type="text" placeholder="http://127.0.0.1:8765">
+        <div class="wakeup-row">
+            <div style="flex:1;">
+                <label for="wakeup-bridge-key">桥接密钥</label>
+                <input id="wakeup-bridge-key" type="text" placeholder="与 bridge.py 的 KEY 一致">
+            </div>
+            <div style="flex:1;">
+                <label for="wakeup-api-key">注入端点密钥</label>
+                <input id="wakeup-api-key" type="text" placeholder="与 wake_job.sh 的 API_KEY 一致">
+            </div>
+        </div>
+        <div class="wakeup-hint">两端密钥需一致，防止本地其他程序误调用。</div>
+    </div>
+
+    <div class="wakeup-card">
+        <h5>默认时间（说「晚安」时生效）</h5>
+        <div class="wakeup-row">
+            <label for="wakeup-hour" style="margin:0;">时</label>
+            <input id="wakeup-hour" type="number" min="0" max="23">
+            <label for="wakeup-minute" style="margin:0;">分</label>
+            <input id="wakeup-minute" type="number" min="0" max="59">
+        </div>
+    </div>
+
+    <div class="wakeup-card">
+        <h5>消息模板</h5>
+        <label class="checkbox_label" for="wakeup-confirm">
+            <input id="wakeup-confirm" type="checkbox"> 操作后在聊天里注入系统消息
+        </label>
+        <label for="wakeup-confirm-text">确认模板（{time} 自动替换）</label>
+        <input id="wakeup-confirm-text" type="text">
+        <label for="wakeup-cancel-text">取消模板</label>
+        <input id="wakeup-cancel-text" type="text">
+        <label for="wakeup-wake-text">醒来模板</label>
+        <input id="wakeup-wake-text" type="text">
+    </div>
+
+    <div class="wakeup-card">
+        <h5>生效范围</h5>
+        <label for="wakeup-mode">模式</label>
+        <select id="wakeup-mode">
+            <option value="all">所有聊天都生效</option>
+            <option value="whitelist">仅指定角色聊天生效</option>
+            <option value="off">停用</option>
+        </select>
+        <label for="wakeup-whitelist">白名单角色名（逗号分隔）</label>
+        <input id="wakeup-whitelist" type="text" placeholder="闹钟管家, 早安酱">
+        <div class="wakeup-hint">角色名 = 角色卡的名字，仅在「仅指定角色」模式下生效。</div>
+    </div>
+
+    <button id="wakeup-save" class="menu_button wakeup-save">保存设置</button>
+</div>
