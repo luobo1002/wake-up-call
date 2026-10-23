@@ -16,8 +16,20 @@
 //        SillyTavern/data/<user>/extensions/ 下，重启酒馆。
 //  依赖：Termux 侧运行 termux/bridge.py（见 README）。
 // ============================================================
-import { eventSource, event_types, extension_settings, renderExtensionTemplateAsync, saveSettingsDebounced, getContext } from "../../../extensions.js";
-import { chat, characters, saveChatConditional } from "../../../script.js";
+import { eventSource, event_types, extension_settings, renderExtensionTemplateAsync, saveSettingsDebounced } from "../../../extensions.js";
+
+// 兼容不同版本的 SillyTavern：优先新版全局 API，退化到旧版全局
+function getCtx() {
+    try {
+        if (window.SillyTavern && typeof window.SillyTavern.getContext === "function") {
+            return window.SillyTavern.getContext();
+        }
+        if (typeof window.getContext === "function") {
+            return window.getContext();
+        }
+    } catch (e) { /* ignore */ }
+    return null;
+}
 
 // ---------- 默认设置（可在酒馆扩展设置面板里改）----------
 const defaultSettings = {
@@ -127,14 +139,18 @@ function computeTarget(text) {
 
 // ---------- 注入系统消息（不计入主线）----------
 function injectSystem(text) {
-    chat.push({
+    const ctx = getCtx();
+    if (!ctx || !ctx.chat) return;
+    ctx.chat.push({
         name: "System",
         is_system: true,
         mes: text,
         extra: { wakeup: true },
     });
     eventSource.emit(event_types.CHAT_CHANGED);
-    saveChatConditional();
+    if (typeof ctx.saveChatConditional === "function") {
+        ctx.saveChatConditional();
+    }
 }
 
 // ---------- 调用 Termux 桥：设定 / 取消 ----------
@@ -194,9 +210,9 @@ async function checkBridge() {
 // ---------- 把角色人格 + 最近聊天缓存到手机（供早上离线生成回复）----------
 async function sendRoleCache() {
     try {
-        const ctx = getContext();
-        const ch = (ctx && ctx.characterId !== undefined && characters && characters[ctx.characterId])
-            ? characters[ctx.characterId] : null;
+        const ctx = getCtx();
+        const ch = (ctx && ctx.characterId !== undefined && ctx.characters && ctx.characters[ctx.characterId])
+            ? ctx.characters[ctx.characterId] : null;
         const cacheData = {
             character: ch ? {
                 name: ch.name || "",
@@ -206,7 +222,7 @@ async function sendRoleCache() {
                 mes_example: String(ch.mes_example || "").slice(0, 2000),
             } : null,
             userName: ctx?.name1 || "用户",
-            history: chat.slice(-8).map(m => ({
+            history: (ctx?.chat || []).slice(-8).map(m => ({
                 name: m.name || "",
                 is_user: !!m.is_user,
                 mes: String(m.mes || "").slice(0, 500),
@@ -226,9 +242,9 @@ async function sendRoleCache() {
 
 // ---------- 生效范围判断 ----------
 function getCurrentCharacterName() {
-    const ctx = getContext();
-    if (ctx && ctx.characterId !== undefined && characters && characters[ctx.characterId]) {
-        return characters[ctx.characterId].name;
+    const ctx = getCtx();
+    if (ctx && ctx.characterId !== undefined && ctx.characters && ctx.characters[ctx.characterId]) {
+        return ctx.characters[ctx.characterId].name;
     }
     return null;
 }
