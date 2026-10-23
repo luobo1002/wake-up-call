@@ -44,16 +44,18 @@ cp -f "$EXT_DIR/bridge.py"         "$BIN_DIR/wake_bridge.py"
 cp -f "$EXT_DIR/morning.py"        "$HOME/morning.py"
 cp -f "$EXT_DIR/wake_job.sh"       "$BIN_DIR/wake_job.sh"
 cp -f "$EXT_DIR/wake_cancel.sh"    "$BIN_DIR/wake_cancel.sh"
+cp -f "$EXT_DIR/wake_quick.sh"     "$SHORTCUTS_DIR/wake_quick.sh"
 cp -f "$EXT_DIR/wake_dialog.sh"    "$SHORTCUTS_DIR/wake_dialog.sh"
 chmod +x "$BIN_DIR/wake_bridge.py" "$HOME/morning.py" \
          "$BIN_DIR/wake_job.sh"    "$BIN_DIR/wake_cancel.sh" \
-         "$SHORTCUTS_DIR/wake_dialog.sh"
+         "$SHORTCUTS_DIR/wake_quick.sh" "$SHORTCUTS_DIR/wake_dialog.sh"
 echo "  已部署:"
 echo "    bridge.py        -> $BIN_DIR/wake_bridge.py"
 echo "    morning.py       -> $HOME/morning.py"
 echo "    wake_job.sh      -> $BIN_DIR/wake_job.sh"
 echo "    wake_cancel.sh   -> $BIN_DIR/wake_cancel.sh"
-echo "    wake_dialog.sh   -> $SHORTCUTS_DIR/wake_dialog.sh"
+echo "    wake_quick.sh    -> $SHORTCUTS_DIR/wake_quick.sh（桌面图标菜单）"
+echo "    wake_dialog.sh   -> $SHORTCUTS_DIR/wake_dialog.sh（桌面时间选择器）"
 
 # ---- 默认配置（存在则不覆盖，避免改过的配置丢失）----
 if [ ! -f "$CONFIG_FILE" ]; then

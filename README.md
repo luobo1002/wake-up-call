@@ -114,15 +114,24 @@ bash ~/SillyTavern/data/default-user/extensions/wake-up-call/setup.sh
 
 酒馆里那条"已醒来"系统消息只是附加项：到点后 Termux 会把事件记在 `~/wakeup_event.json`，**下次打开酒馆时扩展自动补写进聊天记录**（打开酒馆期间每 60 秒检查一次，到点后开着的酒馆也会自动补上），不影响提醒本身。**如果你完全不想要酒馆消息**，把 `~/bin/wake_job.sh` 里写 `~/wakeup_event.json` 的那行注释掉即可。
 
-## 独立弹窗设提醒（完全绕开酒馆）
+## 桌面图标快捷提醒（不打开酒馆，点一下就用）
 
-如果连"设提醒"都不想打开酒馆，用 `~/.shortcuts/wake_dialog.sh`（setup.sh 已自动部署）：
+setup.sh 已自动部署两个桌面快捷脚本到 `~/.shortcuts/`。安装后**一次性设置**：
 
 ```bash
 pkg install termux-api termux-widget
 ```
 
-然后**长按手机桌面 → 添加小部件 → Termux:Widget → 选 wake_dialog**，桌面上就会多一个按钮。点一下直接弹出系统时间选择器，选好时间就设好提醒，全程不碰酒馆。
+然后**长按手机桌面 → 添加小部件 → Termux:Widget**，选一个：
+
+| 小部件 | 作用 |
+|---|---|
+| **wake_quick** | 弹出快捷菜单：15分钟后 / 30分钟后 / 1小时后 / 明天早上8点 / 自定义时间 / 取消提醒 —— **推荐**，点一下选完就设好 |
+| **wake_dialog** | 弹出系统时间选择器，选好时间就设好提醒 |
+
+桌面上出现 Termux 图标后，点一下直接设提醒，全程不碰酒馆。小部件名字想改：用文件管理器改 `~/.shortcuts/wake_quick.sh` 的文件名即可（去掉 .sh 更简洁）。
+
+> 说明：真正的"悬浮窗"需要 Termux 官方的 Termux:Float 插件（Play 商店付费 App，提供悬浮终端）。桌面小部件是免费方案里最接近的——图标在桌面，点一下就用。
 
 ---
 
@@ -152,6 +161,7 @@ pkg install termux-api termux-widget
 | `morning.py` | `~/morning.py` | 读角色缓存 + 配置 → 调 AI API 生成角色早安回复 |
 | `wake_job.sh` | `~/bin/wake_job.sh` | 到点执行：弹普通通知显示角色回复 + 写"已醒来"事件 |
 | `wake_cancel.sh` | `~/bin/wake_cancel.sh` | 取消提醒（通知点击 / 手动执行） |
+| `wake_quick.sh` | `~/.shortcuts/wake_quick.sh` | **桌面图标快捷菜单**（点一下选时间设提醒，推荐） |
 | `wake_dialog.sh` | `~/.shortcuts/wake_dialog.sh` | 桌面快捷方式弹窗，不打开酒馆直接设提醒 |
 
 配置文件（部署后自动生成）：`~/wakeup_config.json`（密钥 + API 配置，酒馆设置面板保存时自动同步）；`~/wakeup_cache.json`（角色缓存）；`~/wake_bridge.log`（桥日志）。
