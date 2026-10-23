@@ -18,7 +18,6 @@
 // ============================================================
 import { eventSource, event_types, extension_settings, renderExtensionTemplateAsync, saveSettingsDebounced, getContext } from "../../../extensions.js";
 import { chat, characters, saveChatConditional } from "../../../script.js";
-import { app } from "../../../server.js";
 
 // ---------- 默认设置（可在酒馆扩展设置面板里改）----------
 const defaultSettings = {
@@ -264,16 +263,23 @@ function handleUserMessage(data) {
     }
 }
 
-// ---------- 注入端点：Termux 到点后回调这里 ----------
-// GET http://127.0.0.1:8000/api/wake-up?key=xxx&text=xxx
-app.get("/api/wake-up", (req, res) => {
-    if (req.query.key !== settings.apiKey) {
-        return res.status(403).json({ ok: false, error: "bad key" });
+// ---------- 到点事件补注入：酒馆打开时把「已醒来」写入聊天 ----------
+// 到点后 Termux 会写 ~/wakeup_event.json；酒馆前端每次打开（及每 60 秒）
+// 检查一次桥，有未消费事件就注入系统消息并清除（不计入主线剧情）。
+async function consumeWakeEvent() {
+    try {
+        const res = await fetch(`${settings.bridgeUrl}/event?key=${encodeURIComponent(settings.bridgeKey)}`, { method: "GET" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.ok && data.text) {
+            injectSystem(data.text);
+            await fetch(`${settings.bridgeUrl}/event-consume?key=${encodeURIComponent(settings.bridgeKey)}`, { method: "GET" });
+            console.log("[WakeUp] 已补注入醒来消息:", data.text);
+        }
+    } catch (e) {
+        // 桥未启动时静默跳过，下次再查
     }
-    const text = req.query.text || settings.wakeText;
-    injectSystem(text);
-    res.json({ ok: true });
-});
+}
 
 // ---------- 设置面板 ----------
 jQuery(async () => {
@@ -310,6 +316,10 @@ jQuery(async () => {
             el.css("color", ok ? "#3fb950" : "#f85149");
         }
     });
+
+    // 到点事件补注入：打开酒馆时检查一次，之后每 60 秒轮询
+    consumeWakeEvent();
+    setInterval(consumeWakeEvent, 60000);
 
     $("#wakeup-copy-cmd").on("click", async () => {
         const cmd = $("#wakeup-deploy-cmd").val();

@@ -4,8 +4,6 @@
   "requires": [],
   "optional": [],
   "js": "index.js",
-  "css": "",
-  "author": "user",
-  "version": "1.0.0",
-  "homePage": ""
+  "author": "luobo1002",
+  "version": "1.1.0"
 }

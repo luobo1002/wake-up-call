@@ -6,6 +6,8 @@
 #    GET  /ping                         健康检查
 #    GET  /schedule?key=&ts=<毫秒>&text= 设定提醒（普通通知弹窗）
 #    GET  /cancel?key=                  取消提醒
+#    GET  /event?key=                   读取"已醒来"事件（酒馆前端补注入用）
+#    GET  /event-consume?key=           消费事件（清除）
 #    POST /cache?key=                   保存角色缓存
 #    POST /config?key=                  保存配置（密钥 + AI API，来自酒馆扩展）
 #  ------------------------------------------------------------
@@ -24,6 +26,7 @@ PORT = 8765
 JOB_ID = 4217
 CONFIG_FILE = os.path.expanduser("~/wakeup_config.json")
 CACHE_FILE = os.path.expanduser("~/wakeup_cache.json")
+EVENT_FILE = os.path.expanduser("~/wakeup_event.json")
 JOB_SCRIPT = os.path.expanduser("~/bin/wake_job.sh")
 
 # 是否同时调起系统闹钟（默认 False = 只弹普通通知）
@@ -130,6 +133,28 @@ class Handler(BaseHTTPRequestHandler):
             target = datetime.datetime.fromtimestamp(ts / 1000)
             log(f"已设定提醒 {target:%m-%d %H:%M}（{text}）")
             self.reply(200, {"ok": True, "target": target.strftime("%Y-%m-%d %H:%M")})
+
+        elif self.path.startswith("/event-consume"):
+            if not self._key_ok(q):
+                self.reply(403, {"ok": False, "error": "bad key"})
+                return
+            try:
+                os.remove(EVENT_FILE)
+            except Exception:
+                pass
+            log("醒来事件已消费")
+            self.reply(200, {"ok": True})
+
+        elif self.path.startswith("/event"):
+            if not self._key_ok(q):
+                self.reply(403, {"ok": False, "error": "bad key"})
+                return
+            try:
+                with open(EVENT_FILE, encoding="utf-8") as f:
+                    data = json.load(f)
+                self.reply(200, {"ok": True, "text": data.get("text", "")})
+            except Exception:
+                self.reply(200, {"ok": True, "text": ""})
 
         elif self.path.startswith("/cancel"):
             if not self._key_ok(q):

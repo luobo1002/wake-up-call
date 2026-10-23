@@ -70,6 +70,9 @@ bash ~/SillyTavern/data/default-user/extensions/wake-up-call/setup.sh
                                                     └── termux-notification 普通通知弹窗
                                                           （标题=角色名，内容=角色的话，
                                                            声音+震动，点击可取消）
+                                                      └── 写 ~/wakeup_event.json
+                                                            → 酒馆下次打开时扩展自动
+                                                              补注入"已醒来"系统消息
 ```
 
 **关键点：到点后酒馆网页（浏览器）完全不用打开**——通知是 Termux 系统通知，角色回复由 Termux 直接调 AI API 生成。酒馆只需要在前一天晚上被打开过一次（说晚安/设提醒），之后可以完全关掉。
@@ -109,7 +112,7 @@ bash ~/SillyTavern/data/default-user/extensions/wake-up-call/setup.sh
 - **普通通知弹窗**：`wake_job.sh` 里的 `termux-notification` 弹出高优先级通知横幅（声音+震动），内容就是角色生成的早安回复；
 - 默认**不调系统闹钟**（`bridge.py` 里 `ALARM_ENABLED = False`）；如果你想要系统闹钟响铃，把它改成 `True` 即可（注意部分 ROM 会弹新建闹钟界面需手动确认）。
 
-酒馆里那条"已醒来"系统消息只是附加项——酒馆没打开时，它会被写入聊天记录，下次打开酒馆即可看到，不影响提醒本身。**如果你完全不想要酒馆消息**，把 `~/bin/wake_job.sh` 里的 `curl` 那几行注释掉即可。
+酒馆里那条"已醒来"系统消息只是附加项：到点后 Termux 会把事件记在 `~/wakeup_event.json`，**下次打开酒馆时扩展自动补写进聊天记录**（打开酒馆期间每 60 秒检查一次，到点后开着的酒馆也会自动补上），不影响提醒本身。**如果你完全不想要酒馆消息**，把 `~/bin/wake_job.sh` 里写 `~/wakeup_event.json` 的那行注释掉即可。
 
 ## 独立弹窗设提醒（完全绕开酒馆）
 
@@ -147,7 +150,7 @@ pkg install termux-api termux-widget
 | `setup.sh` | 扩展目录内 | **一键部署脚本**（Termux 跑一次） |
 | `bridge.py` | `~/bin/wake_bridge.py` | 本地 HTTP 桥：设定/取消提醒 + 接收角色缓存 + 配置同步 |
 | `morning.py` | `~/morning.py` | 读角色缓存 + 配置 → 调 AI API 生成角色早安回复 |
-| `wake_job.sh` | `~/bin/wake_job.sh` | 到点执行：弹普通通知显示角色回复（+可选酒馆记录） |
+| `wake_job.sh` | `~/bin/wake_job.sh` | 到点执行：弹普通通知显示角色回复 + 写"已醒来"事件 |
 | `wake_cancel.sh` | `~/bin/wake_cancel.sh` | 取消提醒（通知点击 / 手动执行） |
 | `wake_dialog.sh` | `~/.shortcuts/wake_dialog.sh` | 桌面快捷方式弹窗，不打开酒馆直接设提醒 |
 
@@ -203,4 +206,4 @@ pkg install termux-api termux-widget
 | 到点没弹窗 | 确认 Termux 没被系统杀后台；手动执行 `~/bin/wake_job.sh` 测试；确认设置面板里 API 配置已保存 |
 | 弹窗出现了但内容是"生成失败/请先配置" | 设置面板里 API 配置没保存或填错；先在 Termux 手动跑 `python3 ~/morning.py` 看报错 |
 | 弹窗内容是通用问候、不像角色 | 角色缓存没写入（`~/wakeup_cache.json` 不存在）——说明说晚安时桥没在运行或密钥不一致，扩展没法 POST /cache |
-| 到点有弹窗但酒馆记录没写入 | `wake_job.sh` 里 `API_URL` 端口与酒馆实际端口不一致（不想要酒馆记录就直接注释掉 curl 行） |
+| 到点有弹窗但酒馆记录没写入 | 确认酒馆打开过（扩展打开时自动补注入）；或看 `~/wakeup_event.json` 是否存在（不存在说明事件没写入） |

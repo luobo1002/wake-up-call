@@ -3,14 +3,12 @@
 #  wake_job.sh — 到点执行（由 termux-job-scheduler 触发）
 #  1) 调 morning.py 用 AI API 生成角色"早安"回复
 #  2) termux-notification 弹普通通知（标题=角色名，内容=角色的话）
-#  3) 可选：回调酒馆注入系统消息（酒馆没开也会写进记录）
+#  3) 写 ~/wakeup_event.json（酒馆前端下次打开时自动补注入
+#     "已醒来"系统消息，不计入主线剧情）
 #  ------------------------------------------------------------
 #  放置位置：~/bin/wake_job.sh（由 setup.sh 自动部署，无需手动）
 # ============================================================
 
-API_URL="http://127.0.0.1:8000/api/wake-up"
-# 注入端点密钥从 ~/wakeup_config.json 读取（酒馆扩展设置里统一管理）
-API_KEY=$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/wakeup_config.json"))).get("api_wake_key","wake-2026"))' 2>/dev/null || echo "wake-2026")
 TEXT="【系统】主人已在闹钟时间醒来，新的一天开始咯～"
 
 # 1) 生成角色早安回复（调 AI API，不打开酒馆）
@@ -30,8 +28,6 @@ termux-notification \
     --action "sh ~/bin/wake_cancel.sh" \
     2>/dev/null || echo "[wake_job] 通知发送失败"
 
-# 3) 可选：回调酒馆注入系统消息（不想要就注释掉下面两行）
-curl -s -G "$API_URL" \
-    --data-urlencode "key=$API_KEY" \
-    --data-urlencode "text=$TEXT" \
-    || echo "[wake_job] 回调酒馆失败"
+# 3) 写"已醒来"事件（酒馆前端下次打开时自动补注入系统消息，不计入主线）
+echo "{\"text\":\"$TEXT\",\"ts\":$(date +%s)}" > ~/wakeup_event.json 2>/dev/null \
+    || echo "[wake_job] 事件写入失败"
