@@ -488,7 +488,23 @@ jQuery(async () => {
         settings = { ...defaultSettings, ...extension_settings.wakeup };
     }
 
-    const html = await renderExtensionTemplateAsync("wake-up-call", "settings");
+    // 酒馆入口最先注册：即使设置面板渲染失败，悬浮窗/顶栏也一定存在
+    addTopBarButton();
+    addFloatingIcon();
+
+    // 设置面板（模板加载失败不影响悬浮窗与提醒功能）
+    let html = "";
+    try {
+        html = await renderExtensionTemplateAsync("wake-up-call", "settings");
+    } catch (e) {
+        try {
+            html = await renderExtensionTemplateAsync("third-party/wake-up-call", "settings");
+        } catch (e2) {
+            console.error("[WakeUp] 设置模板加载失败:", e2);
+        }
+    }
+    if (!html) return;
+
     $("#extensions_settings").append(html);
 
     $("#wakeup-bridge-url").val(settings.bridgeUrl);
@@ -586,8 +602,4 @@ jQuery(async () => {
     });
 
     eventSource.on(event_types.MESSAGE_SENT, handleUserMessage);
-
-    // 酒馆入口：顶栏图标（⏰）+ 可移动悬浮窗
-    addTopBarButton();
-    addFloatingIcon();
 });
