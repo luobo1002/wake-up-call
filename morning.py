@@ -39,7 +39,8 @@ def load_config():
         with open(CONFIG_FILE, encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict):
-            for k in ("api_base", "api_key", "model"):
+            for k in ("api_base", "api_key", "model",
+                      "gen_mode", "gen_custom_text", "gen_character", "gen_worldinfo"):
                 if data.get(k):
                     cfg[k] = data[k]
     except Exception:
@@ -55,21 +56,47 @@ def load_cache():
         return None
 
 
-def build_messages(cache):
-    if cache and cache.get("character"):
-        ch = cache["character"]
+def build_messages(cache, mode="auto"):
+    cfg = load_config()
+    ch = (cache or {}).get("character") if cache else None
+    ch_name = (ch or {}).get("name", "角色")
+    ch_desc = (ch or {}).get("description", "")
+    ch_personality = (ch or {}).get("personality", "")
+    ch_scenario = (ch or {}).get("scenario", "")
+    ch_example = (ch or {}).get("mes_example", "")
+    user_name = ((cache or {}).get("userName")) or "用户"
+    history = (cache or {}).get("history", []) if cache else []
+
+    if mode == "description":
+        # 仅角色设定，不读最近聊天
         system = (
-            f"你是角色「{ch.get('name','角色')}」，现在要以这个角色的身份和用户说话。\n"
-            f"人设背景：{ch.get('description','')}\n"
-            f"性格：{ch.get('personality','')}\n"
-            f"场景：{ch.get('scenario','')}\n"
-            f"示例对话：{ch.get('mes_example','')}\n"
-            f"用户称呼：{cache.get('userName','用户')}"
+            f"你是角色「{ch_name}」，现在要以这个角色的身份和用户说话。\n"
+            f"人设背景：{ch_desc}\n"
+            f"性格：{ch_personality}\n"
+            f"场景：{ch_scenario}\n"
+            f"示例对话：{ch_example}\n"
+            f"用户称呼：{user_name}"
         )
-        history = cache.get("history", [])
-    else:
-        system = "你是一个温柔体贴、会关心人的角色，用第二人称对用户说话。"
         history = []
+    elif mode == "worldinfo":
+        # 用绑定的世界书内容生成
+        wi = cfg.get("gen_worldinfo", "") or ""
+        system = (
+            f"你是角色「{ch_name}」，现在要以这个角色的身份和用户说话。\n"
+            f"以下是世界书设定内容，请严格依据它来扮演：\n{wi}\n"
+            f"用户称呼：{user_name}"
+        )
+        history = []
+    else:
+        # auto：角色设定 + 最近聊天
+        system = (
+            f"你是角色「{ch_name}」，现在要以这个角色的身份和用户说话。\n"
+            f"人设背景：{ch_desc}\n"
+            f"性格：{ch_personality}\n"
+            f"场景：{ch_scenario}\n"
+            f"示例对话：{ch_example}\n"
+            f"用户称呼：{user_name}"
+        )
 
     messages = [{"role": "system", "content": system}]
     for m in history[-8:]:
@@ -113,9 +140,15 @@ def call_api(messages):
 
 
 if __name__ == "__main__":
-    cache = load_cache()
-    msgs = build_messages(cache)
-    try:
-        print(call_api(msgs))
-    except Exception as e:
-        print(f"早安～（生成失败：{e}）")
+    cfg = load_config()
+    mode = cfg.get("gen_mode", "auto")
+    # 自定义文本模式：直接发固定内容，不调 AI
+    if mode == "custom" and cfg.get("gen_custom_text"):
+        print(cfg["gen_custom_text"].strip())
+    else:
+        cache = load_cache()
+        msgs = build_messages(cache, mode)
+        try:
+            print(call_api(msgs))
+        except Exception as e:
+            print(f"早安～（生成失败：{e}）")

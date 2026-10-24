@@ -65,7 +65,11 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "api_wake_key": "wake-2026",
     "api_base": "",
     "api_key": "",
-    "model": ""
+    "model": "",
+    "gen_mode": "auto",
+    "gen_custom_text": "",
+    "gen_character": "",
+    "gen_worldinfo": ""
 }
 EOF
     echo "== 已生成默认配置 $CONFIG_FILE =="

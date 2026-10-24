@@ -47,6 +47,11 @@ const defaultSettings = {
     wakeText: "【系统】主人已在闹钟时间醒来，新的一天开始咯～",
     mode: "all",                          // 生效范围：all=所有聊天 / whitelist=仅白名单角色 / off=停用
     whitelist: [],                        // 白名单角色名数组（mode=whitelist 时生效）
+    genMode: "auto",                      // 早安生成方式：auto=角色+最近聊天 / description=仅角色设定 / worldinfo=世界书 / custom=自定义文本
+    genCustomText: "",                    // 自定义文本（genMode=custom 时直接发这条，不调 AI）
+    genCharacter: "",                     // 绑定角色名（非空时只在该角色聊天里触发）
+    genWorldinfoUid: "",                  // 选中的世界书条目 uid
+    genWorldinfoContent: "",              // 选中的世界书条目内容（同步给 morning.py）
 };
 
 let settings = { ...defaultSettings };
@@ -183,6 +188,10 @@ async function syncConfig() {
             api_base: settings.apiBase,
             api_key: settings.aiApiKey,
             model: settings.apiModel,
+            gen_mode: settings.genMode,
+            gen_custom_text: settings.genCustomText,
+            gen_character: settings.genCharacter,
+            gen_worldinfo: settings.genMode === "worldinfo" ? settings.genWorldinfoContent : "",
         };
         const res = await fetch(`${settings.bridgeUrl}/config?key=${encodeURIComponent(settings.bridgeKey)}`, {
             method: "POST",
@@ -251,9 +260,25 @@ function getCurrentCharacterName() {
 
 function shouldActivate() {
     if (settings.mode === "off") return false;
-    if (settings.mode === "all") return true;
+    if (settings.mode === "all") {
+        if (settings.genCharacter) {
+            const name = getCurrentCharacterName();
+            return name !== null && name === settings.genCharacter;
+        }
+        return true;
+    }
     const name = getCurrentCharacterName();
     return name !== null && settings.whitelist.includes(name);
+}
+
+// ---------- 读取世界书条目（兼容不同版本）----------
+function getWorldInfoEntries() {
+    const ctx = getCtx();
+    if (!ctx || !ctx.worldInfo) return [];
+    const wi = ctx.worldInfo;
+    if (Array.isArray(wi)) return wi;
+    if (wi.entries && Array.isArray(wi.entries)) return wi.entries;
+    return [];
 }
 
 // ---------- 用户消息处理 ----------
@@ -317,6 +342,15 @@ function buildWakePanel() {
       <input id="wakeup-panel-time" type="time" value="08:00" style="flex:1;">
       <button id="wakeup-panel-custom" class="menu_button">自定义</button>
     </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;opacity:.75;margin-bottom:3px;">早安回复生成方式</div>
+      <select id="wakeup-panel-genmode" style="width:100%;font-size:12px;">
+        <option value="auto">角色设定 + 最近聊天</option>
+        <option value="description">仅角色设定（不读聊天）</option>
+        <option value="worldinfo">指定世界书内容</option>
+        <option value="custom">自定义固定文本</option>
+      </select>
+    </div>
     <button id="wakeup-panel-cancel" class="menu_button" style="width:100%;margin-bottom:6px;">取消提醒</button>
     <div id="wakeup-panel-msg" style="font-size:11px;opacity:.7;min-height:14px;"></div>
   </div>
@@ -353,6 +387,20 @@ function buildWakePanel() {
         cancelAlarm();
         showWakeMsg("已取消提醒");
     });
+    // 生成方式快捷切换（选择即保存并同步）
+    $panel.find("#wakeup-panel-genmode").val(settings.genMode);
+    $panel.find("#wakeup-panel-genmode").on("change", function () {
+        settings.genMode = $(this).val() || "auto";
+        extension_settings.wakeup = settings;
+        saveSettingsDebounced();
+        syncConfig();
+        showWakeMsg("已切换生成方式：" + {
+            auto: "角色设定 + 最近聊天",
+            description: "仅角色设定",
+            worldinfo: "指定世界书内容",
+            custom: "自定义固定文本",
+        }[settings.genMode]);
+    });
     $("body").append($panel);
     return $panel;
 }
@@ -381,6 +429,59 @@ function addTopBarButton() {
     if (bar.length) bar.append($btn);
 }
 
+// ---------- 悬浮窗：长按/拖动移动位置，单击展开面板 ----------
+function addFloatingIcon() {
+    if ($("#wakeup-fab").length) return;
+    const fab = $('<div id="wakeup-fab" title="Wake-Up 提醒（长按移动，点按展开）">⏰</div>');
+    fab.css({
+        position: "fixed", right: "16px", bottom: "110px", zIndex: 99998,
+        width: "52px", height: "52px", borderRadius: "50%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "26px", cursor: "grab", userSelect: "none", touchAction: "none",
+        background: "var(--SmartThemeBlurTintColor, rgba(40,40,50,.92))",
+        border: "1px solid var(--SmartThemeBorderColor, rgba(128,128,128,.4))",
+        boxShadow: "0 4px 14px rgba(0,0,0,.35)",
+    });
+    let dragging = false, moved = false, startX = 0, startY = 0, downTime = 0;
+    fab.on("pointerdown", function (e) {
+        dragging = true; moved = false;
+        startX = e.clientX; startY = e.clientY; downTime = Date.now();
+        fab.css("cursor", "grabbing");
+        e.preventDefault();
+    });
+    $(document).on("pointermove", function (e) {
+        if (!dragging) return;
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
+        if (moved) {
+            const pos = fab.position();
+            fab.css({ left: pos.left + dx, top: pos.top + dy, right: "auto", bottom: "auto" });
+            startX = e.clientX; startY = e.clientY;
+        }
+    });
+    $(document).on("pointerup", function () {
+        if (!dragging) return;
+        dragging = false;
+        fab.css("cursor", "grab");
+        const dur = Date.now() - downTime;
+        if (!moved && dur < 400) {
+            openWakePanel();
+        } else if (moved) {
+            try {
+                const pos = fab.position();
+                localStorage.setItem("wakeup_fab_pos", JSON.stringify({ left: pos.left, top: pos.top }));
+            } catch (e) { /* ignore */ }
+        }
+    });
+    try {
+        const pos = JSON.parse(localStorage.getItem("wakeup_fab_pos") || "null");
+        if (pos && typeof pos.left === "number") {
+            fab.css({ left: pos.left, top: pos.top, right: "auto", bottom: "auto" });
+        }
+    } catch (e) { /* ignore */ }
+    $("body").append(fab);
+}
+
 // ---------- 设置面板 ----------
 jQuery(async () => {
     if (extension_settings.wakeup) {
@@ -404,6 +505,29 @@ jQuery(async () => {
     $("#wakeup-wake-text").val(settings.wakeText);
     $("#wakeup-mode").val(settings.mode);
     $("#wakeup-whitelist").val(settings.whitelist.join(", "));
+    $("#wakeup-gen-mode").val(settings.genMode);
+    $("#wakeup-gen-custom").val(settings.genCustomText);
+
+    // 绑定角色下拉（列出所有已加载角色）
+    const charSelect = $("#wakeup-gen-character");
+    const ctx0 = getCtx();
+    if (ctx0 && ctx0.characters) {
+        ctx0.characters.forEach(c => {
+            if (c && c.name) charSelect.append($("<option>").val(c.name).text(c.name));
+        });
+    }
+    charSelect.val(settings.genCharacter || "");
+
+    // 世界书条目下拉
+    const wiSel = $("#wakeup-gen-worldinfo");
+    const entries = getWorldInfoEntries();
+    entries.forEach(en => {
+        const uid = String(en.uid !== undefined ? en.uid : (en.id !== undefined ? en.id : ""));
+        const label = [en.comment, en.key].filter(Boolean).join("（") + (en.key ? "）" : "") || `条目 ${uid}`;
+        const opt = $("<option>").val(uid).text(String(label).slice(0, 60)).data("content", String(en.content || "").slice(0, 2000));
+        wiSel.append(opt);
+    });
+    wiSel.val(settings.genWorldinfoUid || "");
 
     // 部署命令显示
     $("#wakeup-deploy-cmd").val("bash ~/SillyTavern/data/default-user/extensions/wake-up-call/setup.sh");
@@ -447,6 +571,12 @@ jQuery(async () => {
         settings.mode = $("#wakeup-mode").val() || "all";
         settings.whitelist = ($("#wakeup-whitelist").val() || "")
             .split(/[,，]/).map(s => s.trim()).filter(Boolean);
+        settings.genMode = $("#wakeup-gen-mode").val() || "auto";
+        settings.genCustomText = $("#wakeup-gen-custom").val().trim();
+        settings.genCharacter = $("#wakeup-gen-character").val() || "";
+        const wiOpt = $("#wakeup-gen-worldinfo option:selected");
+        settings.genWorldinfoUid = wiOpt.val() || "";
+        settings.genWorldinfoContent = String(wiOpt.data("content") || "");
         extension_settings.wakeup = settings;
         saveSettingsDebounced();
         const synced = await syncConfig();
@@ -457,6 +587,7 @@ jQuery(async () => {
 
     eventSource.on(event_types.MESSAGE_SENT, handleUserMessage);
 
-    // 酒馆顶栏图标（⏰）
+    // 酒馆入口：顶栏图标（⏰）+ 可移动悬浮窗
     addTopBarButton();
+    addFloatingIcon();
 });

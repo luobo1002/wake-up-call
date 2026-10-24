@@ -38,6 +38,10 @@ DEFAULTS = {
     "api_base": "",
     "api_key": "",
     "model": "",
+    "gen_mode": "auto",
+    "gen_custom_text": "",
+    "gen_character": "",
+    "gen_worldinfo": "",
 }
 
 

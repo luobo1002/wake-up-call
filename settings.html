@@ -116,6 +116,24 @@
     </div>
 
     <div class="wakeup-card">
+        <h5>早安回复 · 生成方式</h5>
+        <label for="wakeup-gen-mode">生成内容来源</label>
+        <select id="wakeup-gen-mode">
+            <option value="auto">角色设定 + 最近聊天（默认）</option>
+            <option value="description">仅角色设定（不读取聊天）</option>
+            <option value="worldinfo">指定世界书条目内容</option>
+            <option value="custom">自定义固定文本（不调 AI）</option>
+        </select>
+        <label for="wakeup-gen-character">绑定角色（留空=全部聊天生效）</label>
+        <select id="wakeup-gen-character"><option value="">不绑定（全部生效）</option></select>
+        <div class="wakeup-hint">绑定后，只有和该角色聊天时「晚安/提醒」才会触发。</div>
+        <label for="wakeup-gen-worldinfo">世界书条目（选「指定世界书」时生效）</label>
+        <select id="wakeup-gen-worldinfo"><option value="">未选择条目</option></select>
+        <label for="wakeup-gen-custom">自定义文本（选「自定义」时生效）</label>
+        <input id="wakeup-gen-custom" type="text" placeholder="早上好呀，今天也要元气满满～">
+    </div>
+
+    <div class="wakeup-card">
         <h5>生效范围</h5>
         <label for="wakeup-mode">模式</label>
         <select id="wakeup-mode">
