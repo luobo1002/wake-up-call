@@ -1,224 +1,240 @@
-!/data/data/com.termux/files/usr/bin/python3
-# ============================================================
-#  wake_bridge.py v2.0 — Wake-Up 桥（Termux 本地 HTTP 服务）
-#  ------------------------------------------------------------
-#  端点：
-#    GET  /ping                              健康检查
-#    GET  /schedule?key=&ts=<毫秒>&text=&alarm=1  设定提醒
-#    GET  /cancel?key=                       取消提醒
-#    GET  /event?key=                        读取"已醒来"事件
-#    GET  /event-consume?key=                消费事件（清除）
-#    POST /cache?key=                        保存角色+聊天缓存
-#    POST /config?key=                       保存配置
-#  ------------------------------------------------------------
-#  配置文件：~/wakeup_config.json
-#  启动：python3 ~/bin/wake_bridge.py
-#  常驻：nohup python3 ~/bin/wake_bridge.py > ~/wake_bridge.log 2>&1 &
-# ============================================================
+#!/usr/bin/env python3
+"""
+Wake-Up Call Bridge v3.0
+Termux 侧桥接服务，监听来自酒馆插件的调度请求，触发 Android 系统闹钟。
+
+依赖安装（Termux）：
+  pip install flask
+  
+启动：
+  python bridge.py
+
+默认端口：8765
+"""
+
 import json
 import os
 import subprocess
-import datetime
+import threading
+import time
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
-PORT = 8765
-JOB_ID = 4217
-CONFIG_FILE = os.path.expanduser("~/wakeup_config.json")
-CACHE_FILE  = os.path.expanduser("~/wakeup_cache.json")
-EVENT_FILE  = os.path.expanduser("~/wakeup_event.json")
-JOB_SCRIPT  = os.path.expanduser("~/bin/wake_job.sh")
+# ── 配置 ──────────────────────────────────────────────────────
+PORT    = int(os.environ.get("WUC_PORT", "8765"))
+API_KEY = os.environ.get("WUC_KEY", "wake-2026")
+ALARM_CMD = "am"           # Android am 命令（Termux 可调用）
+NOTIF_CMD = "termux-notification"
 
-DEFAULTS = {
-    "bridge_key":      "wake-2026",
-    "gen_mode":        "auto",
-    "gen_custom_text": "",
-    "gen_character":   "",
-    "gen_worldinfo":   "",
+# ── 状态 ─────────────────────────────────────────────────────
+state = {
+    "scheduled_ts":   None,
+    "scheduled_label": None,
+    "event_pending":  False,
+    "event_text":     None,
+    "cache":          None,    # 角色 + 历史缓存
 }
+state_lock = threading.Lock()
+alarm_timer = None
 
-# ── 配置读写 ────────────────────────────────────────────────
-def load_config():
-    cfg = dict(DEFAULTS)
-    try:
-        with open(CONFIG_FILE, encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            cfg.update({k: data.get(k, v) for k, v in cfg.items()})
-    except Exception:
-        pass
-    return cfg
 
-def save_config(data):
-    cfg = load_config()
-    cfg.update({k: v for k, v in data.items() if k in DEFAULTS})
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
-    return cfg
+def check_key(qs):
+    keys = qs.get("key", [""])
+    return keys[0] == API_KEY
 
-def log(msg):
-    print(f"[{datetime.datetime.now():%H:%M:%S}] {msg}", flush=True)
 
-# ── 系统闹钟（通过 Android am 命令）──────────────────────────
-def set_system_alarm(ts_ms):
-    dt = datetime.datetime.fromtimestamp(ts_ms / 1000)
-    cmd = [
-        "am", "start",
-        "-a", "android.intent.action.SET_ALARM",
-        "--ei", "android.intent.extra.alarm.HOUR",    str(dt.hour),
-        "--ei", "android.intent.extra.alarm.MINUTES", str(dt.minute),
-        "--es", "android.intent.extra.alarm.MESSAGE", "起床啦～",
-        "--ez", "android.intent.extra.alarm.SKIP_UI", "true",
-    ]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        log(f"系统闹钟 → {dt:%H:%M}  {r.stderr.strip() or 'ok'}")
-    except Exception as e:
-        log(f"设置系统闹钟失败: {e}")
+def schedule_alarm(ts_ms, label, enable_alarm=True):
+    """用 Android am 设置系统闹钟（Termux 版）"""
+    global alarm_timer
 
-# ── Termux Job Scheduler ─────────────────────────────────────
-def schedule_job(timestamp_ms):
-    cmd = [
-        "termux-job-scheduler",
-        "--job-id",      str(JOB_ID),
-        "--timestamp",   str(timestamp_ms),
-        "--script-path", JOB_SCRIPT,
-    ]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        log(f"job-scheduler: {r.stdout.strip()} {r.stderr.strip()}")
-    except Exception as e:
-        log(f"注册定时任务失败: {e}")
+    # 取消已有定时器
+    if alarm_timer:
+        alarm_timer.cancel()
+        alarm_timer = None
 
-def cancel_job():
-    try:
-        subprocess.run(
-            ["termux-job-scheduler", "--cancel", str(JOB_ID)],
-            capture_output=True, text=True, timeout=15
-        )
-        return True
-    except Exception as e:
-        log(f"取消任务失败: {e}")
-        return False
+    delay_s = (ts_ms - time.time() * 1000) / 1000.0
+    if delay_s < 1:
+        return
 
-# ── HTTP 处理器 ───────────────────────────────────────────────
-class Handler(BaseHTTPRequestHandler):
-
-    def _key_ok(self, q):
-        return q.get("key", [""])[0] == load_config()["bridge_key"]
-
-    def do_GET(self):
-        parsed = urlparse(self.path)
-        q = parse_qs(parsed.query)
-        path = parsed.path
-
-        # 健康检查
-        if path == "/ping":
-            self.reply(200, {"ok": True, "version": "2.0", "config": os.path.exists(CONFIG_FILE)})
-            return
-
-        if not self._key_ok(q):
-            self.reply(403, {"ok": False, "error": "bad key"})
-            return
-
-        # 设定提醒
-        if path == "/schedule":
-            try:
-                ts = int(q["ts"][0])
-            except Exception:
-                self.reply(400, {"ok": False, "error": "bad ts"}); return
-            now_ms = int(datetime.datetime.now().timestamp() * 1000)
-            if ts <= now_ms:
-                self.reply(400, {"ok": False, "error": "ts in the past"}); return
-
-            text      = q.get("text",  [""])[0]
-            use_alarm = q.get("alarm", ["0"])[0] == "1"
-
-            if use_alarm:
-                set_system_alarm(ts)
-            schedule_job(ts)
-
-            target = datetime.datetime.fromtimestamp(ts / 1000)
-            log(f"已设定提醒 {target:%m-%d %H:%M}（{text}，系统闹钟={'开' if use_alarm else '关'}）")
-            self.reply(200, {"ok": True, "target": target.strftime("%Y-%m-%d %H:%M")})
-
-        # 取消提醒
-        elif path == "/cancel":
-            ok = cancel_job()
-            log("提醒已取消")
-            self.reply(200, {"ok": ok})
-
-        # 读取醒来事件
-        elif path == "/event":
-            try:
-                with open(EVENT_FILE, encoding="utf-8") as f:
-                    data = json.load(f)
-                self.reply(200, {"ok": True, "text": data.get("text", "")})
-            except Exception:
-                self.reply(200, {"ok": True, "text": ""})
-
-        # 消费醒来事件
-        elif path == "/event-consume":
-            try:
-                os.remove(EVENT_FILE)
-            except Exception:
-                pass
-            log("醒来事件已消费")
-            self.reply(200, {"ok": True})
-
-        else:
-            self.reply(404, {"ok": False, "error": "not found"})
-
-    def do_POST(self):
-        parsed = urlparse(self.path)
-        q = parse_qs(parsed.query)
-        path = parsed.path
-
-        if not self._key_ok(q):
-            self.reply(403, {"ok": False, "error": "bad key"}); return
-
+    if enable_alarm:
+        # 通过 am 广播设置系统闹钟（Android intent）
+        ts_sec = int(ts_ms / 1000)
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            body   = json.loads(self.rfile.read(length).decode("utf-8"))
+            subprocess.Popen([
+                ALARM_CMD, "start", "-a", "android.intent.action.SET_ALARM",
+                "--ei", "android.intent.extra.alarm.HOUR", str(datetime.fromtimestamp(ts_sec).hour),
+                "--ei", "android.intent.extra.alarm.MINUTES", str(datetime.fromtimestamp(ts_sec).minute),
+                "--ez", "android.intent.extra.alarm.SKIP_UI", "true",
+                "--es", "android.intent.extra.alarm.MESSAGE", f"WUC: {label}",
+            ], stderr=subprocess.DEVNULL)
+            print(f"[WUC] 系统闹钟已设置：{label}")
+        except Exception as e:
+            print(f"[WUC] am 调用失败：{e}")
+
+        # 也发送 termux 通知
+        try:
+            subprocess.Popen([
+                NOTIF_CMD,
+                "--title", "Wake-Up Call",
+                "--content", f"提醒已设置：{label}",
+                "--id", "wuc-scheduled",
+            ], stderr=subprocess.DEVNULL)
         except Exception:
-            self.reply(400, {"ok": False, "error": "bad body"}); return
+            pass
 
-        # 保存角色+聊天缓存
-        if path == "/cache":
-            with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(body, f, ensure_ascii=False, indent=2)
-            char = (body.get("character") or {}).get("name", "未知角色")
-            hist = len(body.get("history", []))
-            log(f"缓存已更新：角色={char}，历史={hist}条，生成方式={body.get('genMode','?')}")
-            self.reply(200, {"ok": True})
+    # 本地 Python 定时器（作为备用 / 触发事件）
+    def on_fire():
+        with state_lock:
+            state["event_pending"] = True
+            state["event_text"]    = label
+        print(f"[WUC] 提醒触发：{label}")
+        # 发送到点通知
+        try:
+            subprocess.Popen([
+                NOTIF_CMD,
+                "--title", "⏰ Wake-Up Call",
+                "--content", label,
+                "--id", "wuc-fired",
+                "--priority", "high",
+                "--sound",
+            ], stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
-        # 保存配置
-        elif path == "/config":
-            cfg = save_config(body)
-            log(f"配置已同步：gen_mode={cfg.get('gen_mode')}，char={cfg.get('gen_character') or '(全局)'}")
-            self.reply(200, {"ok": True, "config": {"bridge_key": cfg["bridge_key"]}})
+    alarm_timer = threading.Timer(delay_s, on_fire)
+    alarm_timer.daemon = True
+    alarm_timer.start()
 
-        else:
-            self.reply(404, {"ok": False, "error": "not found"})
 
-    def reply(self, code, obj):
-        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        pass   # 静默日志
+
+    def send_json(self, code, data):
+        body = json.dumps(data).encode()
         self.send_response(code)
-        self.send_header("Content-Type",   "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", len(body))
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, *args):
-        pass   # 静默 HTTP 访问日志，只保留 log() 输出
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        path = parsed.path
+
+        # ── /ping ──
+        if path == "/ping":
+            self.send_json(200, {"ok": True, "version": "3.0"})
+            return
+
+        if not check_key(qs):
+            self.send_json(403, {"ok": False, "error": "bad key"})
+            return
+
+        # ── /schedule?ts=...&text=...&alarm=1 ──
+        if path == "/schedule":
+            ts_list = qs.get("ts", [])
+            label   = qs.get("text", ["提醒"])[0]
+            alarm   = qs.get("alarm", ["1"])[0] == "1"
+            if not ts_list:
+                self.send_json(400, {"ok": False, "error": "missing ts"}); return
+            ts_ms = int(ts_list[0])
+            with state_lock:
+                state["scheduled_ts"]    = ts_ms
+                state["scheduled_label"] = label
+                state["event_pending"]   = False
+            schedule_alarm(ts_ms, label, alarm)
+            self.send_json(200, {"ok": True, "ts": ts_ms, "label": label})
+            return
+
+        # ── /cancel ──
+        if path == "/cancel":
+            global alarm_timer
+            if alarm_timer:
+                alarm_timer.cancel()
+                alarm_timer = None
+            with state_lock:
+                state["scheduled_ts"] = None
+                state["event_pending"] = False
+            self.send_json(200, {"ok": True})
+            return
+
+        # ── /event（查询是否有到点事件，不消费） ──
+        if path == "/event":
+            with state_lock:
+                pending = state["event_pending"]
+                text    = state["event_text"]
+            self.send_json(200, {"ok": pending, "text": text if pending else None})
+            return
+
+        # ── /event-consume（消费事件） ──
+        if path == "/event-consume":
+            with state_lock:
+                pending = state["event_pending"]
+                text    = state["event_text"]
+                state["event_pending"] = False
+                state["event_text"]    = None
+            self.send_json(200, {"ok": pending, "text": text if pending else None})
+            return
+
+        # ── /status ──
+        if path == "/status":
+            with state_lock:
+                s = dict(state)
+                s.pop("cache", None)   # 不暴露缓存
+            self.send_json(200, {"ok": True, "state": s})
+            return
+
+        self.send_json(404, {"ok": False, "error": "not found"})
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        path = parsed.path
+
+        if not check_key(qs):
+            self.send_json(403, {"ok": False, "error": "bad key"}); return
+
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length) if length else b"{}"
+        try:
+            data = json.loads(body)
+        except Exception:
+            data = {}
+
+        # ── POST /cache ── 存储角色 + 历史数据（供未来生成晨安消息用）
+        if path == "/cache":
+            with state_lock:
+                state["cache"] = data
+            print(f"[WUC] 角色缓存已更新：{data.get('character', {}).get('name', '?')}")
+            self.send_json(200, {"ok": True})
+            return
+
+        self.send_json(404, {"ok": False, "error": "not found"})
+
+
+def main():
+    print(f"[WUC] Wake-Up Call Bridge v3.0 启动中...")
+    print(f"[WUC] 监听端口：{PORT}")
+    print(f"[WUC] API Key：{API_KEY}")
+    print(f"[WUC] 按 Ctrl+C 停止")
+
+    server = HTTPServer(("0.0.0.0", PORT), Handler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[WUC] 已停止")
 
 
 if __name__ == "__main__":
-    cfg = load_config()
-    log(f"Wake-Up 桥 v2.0 已启动: http://127.0.0.1:{PORT}")
-    log(f"密钥={cfg['bridge_key']}，生成方式={cfg['gen_mode']}")
-    try:
-        HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
-    except KeyboardInterrupt:
-        log("已停止")
+    main()
