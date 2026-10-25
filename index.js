@@ -301,64 +301,94 @@ function getWorldInfoEntries() {
 const FAB_STORAGE_KEY = "wakeup_fab_pos_v2";
 
 function addFloatingButton() {
-  if ($("#wakeup-fab").length) return;
+  if (document.getElementById("wakeup-fab")) return;
 
-  const $fab = $(`
-    <div id="wakeup-fab" title="Wake-Up 提醒（长按拖动，点按展开）">
-      <div class="wakeup-fab-icon">⏰</div>
-      <div class="wakeup-fab-pulse"></div>
-    </div>
-  `);
+  // 用原生 DOM 创建，避免 jQuery 模板解析问题
+  const fab = document.createElement("div");
+  fab.id = "wakeup-fab";
+  fab.title = "Wake-Up 提醒（长按拖动，点按展开）";
+
+  const icon = document.createElement("div");
+  icon.className = "wakeup-fab-icon";
+  icon.textContent = "⏰";
+
+  const pulse = document.createElement("div");
+  pulse.className = "wakeup-fab-pulse";
+
+  fab.appendChild(icon);
+  fab.appendChild(pulse);
 
   // 恢复保存的位置
   try {
     const pos = JSON.parse(localStorage.getItem(FAB_STORAGE_KEY) || "null");
-    if (pos?.left !== undefined) {
-      $fab.css({ left: pos.left, top: pos.top, right: "auto", bottom: "auto" });
+    if (pos && typeof pos.left === "number") {
+      fab.style.left   = pos.left + "px";
+      fab.style.top    = pos.top  + "px";
+      fab.style.right  = "auto";
+      fab.style.bottom = "auto";
     }
   } catch {}
 
   // 拖拽逻辑
   let dragging = false, moved = false, sx = 0, sy = 0, t0 = 0;
 
-  $fab.on("pointerdown", e => {
+  fab.addEventListener("pointerdown", e => {
     dragging = true; moved = false;
     sx = e.clientX; sy = e.clientY; t0 = Date.now();
-    $fab.css("cursor", "grabbing");
+    fab.style.cursor = "grabbing";
     e.preventDefault();
   });
 
-  $(document).on("pointermove.wakeup-fab", e => {
+  document.addEventListener("pointermove", e => {
     if (!dragging) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
     if (moved) {
-      const r = $fab[0].getBoundingClientRect();
-      $fab.css({ left: r.left + dx, top: r.top + dy, right: "auto", bottom: "auto" });
+      const r = fab.getBoundingClientRect();
+      fab.style.left   = (r.left + dx) + "px";
+      fab.style.top    = (r.top  + dy) + "px";
+      fab.style.right  = "auto";
+      fab.style.bottom = "auto";
       sx = e.clientX; sy = e.clientY;
     }
   });
 
-  $(document).on("pointerup.wakeup-fab", () => {
+  document.addEventListener("pointerup", () => {
     if (!dragging) return;
     dragging = false;
-    $fab.css("cursor", "grab");
-    if (!moved && Date.now() - t0 < 400) {
+    fab.style.cursor = "grab";
+    if (!moved && Date.now() - t0 < 500) {
       openPanel();
     } else if (moved) {
       try {
-        const r = $fab[0].getBoundingClientRect();
+        const r = fab.getBoundingClientRect();
         localStorage.setItem(FAB_STORAGE_KEY, JSON.stringify({ left: r.left, top: r.top }));
       } catch {}
     }
   });
 
-  $("body").append($fab);
+  document.body.appendChild(fab);
+}
 
-  // 注入 FAB 样式
-  if (!$("#wakeup-styles").length) {
-    $("head").append(`<style id="wakeup-styles">${getStyles()}</style>`);
+// ---------- 顶栏备用入口 ----------
+function addTopBarButton() {
+  if (document.getElementById("wakeup-topbar-btn")) return;
+  // 尝试几个常见选择器
+  const barSelectors = ["#top-bar", "#topbar", ".top-bar", "#chat-header-buttons", "#extensionsMenuButton"];
+  let bar = null;
+  for (const sel of barSelectors) {
+    bar = document.querySelector(sel);
+    if (bar) break;
   }
+  if (!bar) return;
+
+  const btn = document.createElement("div");
+  btn.id = "wakeup-topbar-btn";
+  btn.title = "Wake-Up 提醒";
+  btn.textContent = "⏰";
+  btn.style.cssText = "cursor:pointer;font-size:18px;padding:0 6px;display:flex;align-items:center;user-select:none;";
+  btn.addEventListener("click", openPanel);
+  bar.appendChild(btn);
 }
 
 // ============================================================
@@ -368,33 +398,36 @@ function getStyles() {
   return `
 /* ===== Wake-Up Call 样式 ===== */
 #wakeup-fab {
-  position: fixed;
-  right: 20px;
-  bottom: 120px;
-  z-index: 99998;
-  width: 54px;
-  height: 54px;
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 160px !important;
+  z-index: 2147483647 !important;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   cursor: grab;
   user-select: none;
   touch-action: none;
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 .wakeup-fab-icon {
   position: relative;
   z-index: 2;
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  background: linear-gradient(135deg, rgba(60,60,80,.95) 0%, rgba(35,35,50,.98) 100%);
-  border: 1.5px solid rgba(150,130,255,.35);
-  box-shadow: 0 4px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+  font-size: 28px;
+  background: linear-gradient(135deg, rgba(80,60,140,.97) 0%, rgba(40,35,80,.99) 100%);
+  border: 2px solid rgba(160,140,255,.6);
+  box-shadow: 0 4px 20px rgba(0,0,0,.6), 0 0 0 3px rgba(140,120,255,.15), inset 0 1px 0 rgba(255,255,255,.12);
   transition: transform .15s, box-shadow .15s;
 }
 #wakeup-fab:active .wakeup-fab-icon {
@@ -1083,13 +1116,21 @@ jQuery(async () => {
     settings = { ...defaultSettings, ...extension_settings.wakeup };
   }
 
-  // 注入 CSS
-  if (!$("#wakeup-styles").length) {
-    $("head").append(`<style id="wakeup-styles">${getStyles()}</style>`);
+  // 注入 CSS（用原生 DOM，不依赖 jQuery）
+  if (!document.getElementById("wakeup-styles")) {
+    const style = document.createElement("style");
+    style.id = "wakeup-styles";
+    style.textContent = getStyles();
+    document.head.appendChild(style);
   }
 
-  // 悬浮按钮（最优先，保证总可见）
+  // 悬浮按钮 —— 立即插入 + 延迟再试（等酒馆 body 完全渲染）
   addFloatingButton();
+  setTimeout(addFloatingButton, 1000);
+  setTimeout(addFloatingButton, 3000);
+
+  // 顶栏备用按钮（延迟等顶栏渲染完）
+  setTimeout(addTopBarButton, 2000);
 
   // 酒馆扩展设置面板
   const $extSettings = $("#extensions_settings");
