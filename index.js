@@ -1,5 +1,5 @@
 // ============================================================
-//  Wake-Up Call v3.0 — SillyTavern 独立扩展
+//  Wake-Up Call v3.1 — SillyTavern 独立扩展
 //  不依赖酒馆助手（JS-Slash-Runner），直接挂酒馆原生 API
 //  作者：luobo1002
 // ============================================================
@@ -552,14 +552,20 @@
     } catch (e) {}
   }
 
+  function getTopDoc() {
+    try { return window.top.document; } catch(e) {}
+    try { return window.parent.document; } catch(e) {}
+    return document;
+  }
+
   function updateFabState(armed) {
-    const fab = document.getElementById("wuc-fab");
+    const fab = getTopDoc().getElementById("wuc-fab");
     if (!fab) return;
     fab.classList.toggle("wuc-armed", !!armed);
   }
 
   function updateAlarmBar() {
-    const bar = document.getElementById("wuc-alarm-bar");
+    const bar = getTopDoc().getElementById("wuc-alarm-bar");
     if (!bar) return;
     if (currentAlarm) {
       bar.classList.add("wuc-visible");
@@ -571,7 +577,7 @@
   }
 
   function setStatus(msg, isErr = false) {
-    const el = document.getElementById("wuc-status");
+    const el = getTopDoc().getElementById("wuc-status");
     if (!el) return;
     el.textContent = msg;
     el.className = "wuc-status" + (isErr ? " wuc-err" : "");
@@ -595,7 +601,8 @@
   const ICON_URL = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ICON_SVG);
 
   function mountFab() {
-    if (document.getElementById("wuc-fab")) return;
+    const _td = (function(){ try{return window.top.document;}catch(e){} try{return window.parent.document;}catch(e){} return document; })();
+    if (_td.getElementById("wuc-fab")) return;
     const fab = document.createElement("div");
     fab.id = "wuc-fab";
     const img = document.createElement("img");
@@ -628,7 +635,7 @@
     fab.addEventListener("pointermove", e => {
       if (!dragging) return;
       const dx = e.clientX - startX, dy = e.clientY - startY;
-      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+      if (Math.abs(dx) > 12 || Math.abs(dy) > 12) moved = true;
       if (moved) {
         fab.style.left = (origLeft + dx) + "px";
         fab.style.top  = (origTop  + dy) + "px";
@@ -649,7 +656,13 @@
       }
     });
 
-    document.body.appendChild(fab);
+    // 挂到 top-level document，穿透 iframe
+    const targetDoc = (function(){
+      try { return window.top.document; } catch(e) {}
+      try { return window.parent.document; } catch(e) {}
+      return document;
+    })();
+    targetDoc.body.appendChild(fab);
     if (currentAlarm) fab.classList.add("wuc-armed");
   }
 
@@ -657,7 +670,8 @@
   //  13. 主控制面板
   // ═══════════════════════════════════════════════════════════
   function openPanel() {
-    if (document.getElementById("wuc-overlay")) return;
+    const _td2 = (function(){ try{return window.top.document;}catch(e){} try{return window.parent.document;}catch(e){} return document; })();
+    if (_td2.getElementById("wuc-overlay")) return;
     loadCfg();
 
     const chars = getCharacterList();
@@ -801,7 +815,13 @@
       </div><!-- #wuc-panel -->
     `;
 
-    document.body.appendChild(overlay);
+    // overlay 也挂到 top document，和 fab 同层
+    const _targetDoc = (function(){
+      try { return window.top.document; } catch(e) {}
+      try { return window.parent.document; } catch(e) {}
+      return document;
+    })();
+    _targetDoc.body.appendChild(overlay);
 
     // ── 绑定事件 ──
 
@@ -903,9 +923,11 @@
       cfg.genMode             = overlay.querySelector("#wuc-gen-mode").value;
       cfg.genCustomText       = overlay.querySelector("#wuc-custom-text").value;
       cfg.genWorldbookUid     = overlay.querySelector("#wuc-wb-entry").value;
-      cfg.genWorldbookContent = overlay.querySelector("#wuc-wb-entry").options[
-        overlay.querySelector("#wuc-wb-entry").selectedIndex
-      ]?.dataset.content || cfg.genWorldbookContent;
+      const _wbEl = overlay.querySelector("#wuc-wb-entry");
+      if (_wbEl) {
+        cfg.genWorldbookUid     = _wbEl.value;
+        cfg.genWorldbookContent = _wbEl.options[_wbEl.selectedIndex]?.dataset.content || cfg.genWorldbookContent;
+      }
       cfg.wakeMessage         = overlay.querySelector("#wuc-wake-msg").value;
       cfg.bridgeUrl           = overlay.querySelector("#wuc-bridge-url").value;
       cfg.bridgeKey           = overlay.querySelector("#wuc-bridge-key").value;
@@ -1015,8 +1037,7 @@
   } else {
     init();
   }
-  // 额外重试（SPA 延迟渲染）
-  setTimeout(init, 1200);
+  // 已移除重复 init 调用（原 SPA 重试，会导致事件重复注册）
   setTimeout(() => {
     if (!document.getElementById("wuc-fab")) mountFab();
   }, 3000);
