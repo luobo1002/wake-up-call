@@ -5,8 +5,9 @@
   "optional": [],
   "js": "index.js",
   "css": "style.css",
+  "settings_html": "settings.html",
   "author": "luobo1002",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "homePage": "https://github.com/luobo1002/wake-up-call",
   "auto_update": true
 }
