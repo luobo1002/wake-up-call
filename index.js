@@ -7,21 +7,32 @@
 (function () {
   "use strict";
 
-  // ── 全局 API 兼容层 ──────────────────────────────────────
+  // ── 全局 API 兼容层（穿透 iframe，SillyDroid 酒馆跑在 iframe 里）──
+  function getTop() {
+    try { return window.top || window; } catch (e) { return window; }
+  }
   function getEventSource() {
-    return window.eventSource || null;
+    const top = getTop();
+    return top.eventSource || window.eventSource || null;
   }
   function getEventTypes() {
-    return window.event_types || window.tavern_events || {};
+    const top = getTop();
+    return top.event_types || top.tavern_events || window.event_types || {};
   }
   function getExtSettings() {
-    return window.extension_settings || {};
+    const top = getTop();
+    return top.extension_settings || window.extension_settings || {};
   }
   function saveSettings() {
-    if (typeof window.saveSettingsDebounced === "function") window.saveSettingsDebounced();
+    const top = getTop();
+    const fn = top.saveSettingsDebounced || window.saveSettingsDebounced;
+    if (typeof fn === "function") fn();
   }
   function getCtx() {
+    const top = getTop();
     try {
+      if (top.SillyTavern?.getContext) return top.SillyTavern.getContext();
+      if (typeof top.getContext === "function") return top.getContext();
       if (window.SillyTavern?.getContext) return window.SillyTavern.getContext();
       if (typeof window.getContext === "function") return window.getContext();
     } catch (e) {}
@@ -628,11 +639,11 @@
     overlay.querySelector("#wu-cancel").addEventListener("click", () => {
       cancelAlarm();
       if (settings.confirmInject) injectSystem(settings.cancelText);
-      document.getElementById("wakeup-fab")?.classList.remove("wu-has-alarm");
+      getDoc().getElementById("wakeup-fab")?.classList.remove("wu-has-alarm");
       msg(overlay, "✓ 已取消提醒");
     });
 
-    document.body.appendChild(overlay);
+    getDoc().body.appendChild(overlay);
 
     // 异步检测桥
     checkBridge().then(ok => {
@@ -645,7 +656,7 @@
 
   function closePanel() {
     panelOpen = false;
-    document.getElementById("wakeup-overlay")?.remove();
+    getDoc().getElementById("wakeup-overlay")?.remove();
   }
 
   function msg(overlay, text) {
@@ -663,11 +674,12 @@
 
   // ── 扩展设置面板（酒馆内嵌）────────────────────────────
   function buildSettingsPanel() {
-    const wrap = document.getElementById("extensions_settings");
-    if (!wrap || document.getElementById("wakeup-settings-root")) return;
+    const doc = getDoc();
+    const wrap = doc.getElementById("extensions_settings");
+    if (!wrap || doc.getElementById("wakeup-settings-root")) return;
 
     const ctx = getCtx();
-    const div = document.createElement("div");
+    const div = doc.createElement("div");
     div.id = "wakeup-settings-root";
     div.style.cssText = "padding:8px 0;font-size:13px;";
     div.innerHTML = `
@@ -787,13 +799,15 @@
   }
 
   // DOM 就绪后执行，多重保障
-  if (document.body) {
+  const doc0 = getDoc();
+  if (doc0.body) {
     init();
   } else {
-    document.addEventListener("DOMContentLoaded", init);
+    doc0.addEventListener("DOMContentLoaded", init);
   }
   // 额外延迟重试，防止酒馆异步渲染
   setTimeout(() => { injectCSS(); ensureFab(); }, 800);
   setTimeout(() => { injectCSS(); ensureFab(); buildSettingsPanel(); }, 2500);
+  setTimeout(() => { injectCSS(); ensureFab(); buildSettingsPanel(); }, 5000);
 
 })();
