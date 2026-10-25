@@ -1,9 +1,11 @@
-{
+
   "display_name": "Wake-Up Call",
   "loading_order": 20,
   "requires": [],
   "optional": [],
   "js": "index.js",
   "author": "luobo1002",
-  "version": "1.1.0"
+  "version": "2.0.0",
+  "homePage": "https://github.com/luobo1002/wake-up-call",
+  "auto_update": true
 }
