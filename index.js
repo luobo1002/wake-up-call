@@ -1012,7 +1012,7 @@
     // 启动轮询（Termux 桥事件 + 悬浮球挂载重试）
     setInterval(pollBridgeEvent, 60_000);
     setInterval(() => {
-      if (!document.getElementById("wuc-fab")) mountFab();
+      if (!getTopDoc().getElementById("wuc-fab")) mountFab();
     }, 5_000);
 
     // 侧边栏设置面板入口（酒馆扩展标准接口）
@@ -1027,7 +1027,7 @@
       }
     } catch (e) {}
 
-    console.log("[WUC] Wake-Up Call v3.0 已就绪");
+    console.log("[WUC] Wake-Up Call v3.1 已就绪");
     console.log("[WUC] 支持：晚安 / 明天X点 / X分钟后提醒 / 取消提醒");
   }
 
@@ -1039,7 +1039,7 @@
   }
   // 已移除重复 init 调用（原 SPA 重试，会导致事件重复注册）
   setTimeout(() => {
-    if (!document.getElementById("wuc-fab")) mountFab();
+    if (!getTopDoc().getElementById("wuc-fab")) mountFab();
   }, 3000);
 
 })();
