@@ -1,26 +1,66 @@
-/* Wake-Up Call v4.0 — 侧边栏面板样式 */
+/* Wake-Up Call v5.0 — 内联抽屉样式 */
 
-/* ── 整体容器 ── */
-#wuc-panel-inner {
+/* ── 触发按钮（发送栏旁） ── */
+#wuc-trigger-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  background: transparent;
+  transition: background .15s;
+  flex-shrink: 0;
+  user-select: none;
+}
+#wuc-trigger-btn:hover,
+#wuc-trigger-btn:active { background: rgba(255,255,255,.12); }
+
+.wuc-btn-dot {
+  position: absolute;
+  top: 5px; right: 5px;
+  width: 8px; height: 8px;
+  background: #4caf50;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,.4);
+}
+
+/* ── 内联抽屉 ── */
+#wuc-drawer {
+  width: 100%;
+  background: var(--SmartThemeBlurTintColor, rgba(30,30,40,.97));
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 4px 2px;
   font-size: 14px;
   color: var(--SmartThemeBodyColor, #ccc);
+  /* 非 fixed，跟随文档流，键盘弹起不影响 */
 }
 
-/* ── 标题分组 ── */
-.wuc-section-title {
-  font-size: 12px;
+/* ── 抽屉标题栏 ── */
+.wuc-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-weight: 600;
-  color: var(--SmartThemeQuoteColor, #7eb8f7);
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin-top: 6px;
-  padding-bottom: 3px;
+  font-size: 15px;
+  padding-bottom: 6px;
   border-bottom: 1px solid rgba(255,255,255,.1);
 }
+.wuc-close-btn {
+  background: none; border: none;
+  color: var(--SmartThemeBodyColor, #ccc);
+  font-size: 16px; cursor: pointer;
+  padding: 2px 6px; border-radius: 4px;
+  line-height: 1;
+}
+.wuc-close-btn:hover { background: rgba(255,255,255,.1); }
 
 /* ── 状态栏 ── */
 .wuc-status-bar {
@@ -28,120 +68,128 @@
   align-items: center;
   justify-content: space-between;
   background: rgba(255,255,255,.06);
-  border-radius: 8px;
-  padding: 8px 10px;
   border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  padding: 6px 10px;
   gap: 8px;
 }
 .wuc-status-bar.wuc-armed {
-  background: rgba(80,200,120,.15);
-  border-color: rgba(80,200,120,.4);
+  background: rgba(76,175,80,.15);
+  border-color: rgba(76,175,80,.4);
 }
 #wuc-status-text { flex: 1; font-size: 13px; }
 
-/* ── 快捷按钮网格 ── */
-.wuc-quick-grid {
+/* ── 快捷按钮行 ── */
+.wuc-quick-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 .wuc-q {
   background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: 6px;
   color: inherit;
-  padding: 7px 4px;
+  padding: 8px 4px;
   font-size: 13px;
   cursor: pointer;
-  transition: background .15s;
 }
-.wuc-q:active { background: rgba(255,255,255,.18); }
+.wuc-q:active { background: rgba(255,255,255,.2); }
 
-/* ── 行布局 ── */
+/* ── 时间选择行 ── */
 .wuc-row {
   display: flex;
   gap: 6px;
   align-items: center;
 }
-.wuc-row input[type="time"] { flex: 1; }
+.wuc-row input[type="time"] {
+  flex: 1;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 6px;
+  color: inherit;
+  padding: 7px 8px;
+  font-size: 14px;
+}
 
-/* ── 开关行 ── */
-.wuc-switch-row {
+/* ── details/summary 折叠 ── */
+.wuc-details {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+}
+.wuc-details > summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  background: rgba(255,255,255,.05);
+  user-select: none;
+  list-style: none;
+}
+.wuc-details > summary::-webkit-details-marker { display: none; }
+.wuc-details[open] > summary { border-bottom: 1px solid rgba(255,255,255,.1); }
+.wuc-details > :not(summary) { padding: 0 10px; }
+
+/* ── 设置字段 ── */
+.wuc-field {
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.wuc-field:last-of-type { border-bottom: none; }
+.wuc-field > label, .wuc-field > span:first-child {
+  font-size: 12px;
+  color: var(--SmartThemeEmColor, #aaa);
+}
+.wuc-switch-row {
+  flex-direction: row !important;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
-  gap: 8px;
 }
 
 /* ── 表单控件 ── */
-.wuc-lbl {
-  font-size: 12px;
-  color: var(--SmartThemeEmColor, #aaa);
-  margin-bottom: 2px;
-  display: block;
-}
-.wuc-inp, .wuc-sel, .wuc-ta,
-input[type="time"]#wuc-time-pick,
-input[type="time"]#wuc-default-time {
-  width: 100%;
+.wuc-inp, .wuc-sel, .wuc-ta {
   background: rgba(255,255,255,.07);
   border: 1px solid rgba(255,255,255,.15);
   border-radius: 6px;
   color: inherit;
   padding: 6px 8px;
   font-size: 13px;
+  width: 100%;
   box-sizing: border-box;
 }
-.wuc-ta { resize: vertical; min-height: 52px; font-family: inherit; }
-.wuc-sel option { background: #2a2a2a; }
+.wuc-ta { resize: vertical; min-height: 48px; font-family: inherit; }
+.wuc-sel option { background: #222; }
 
-/* ── Toggle 开关 ── */
+/* ── Toggle ── */
 .wuc-sw { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
 .wuc-sw input { opacity: 0; width: 0; height: 0; }
-.wuc-sl {
-  position: absolute; inset: 0;
-  background: rgba(255,255,255,.2);
-  border-radius: 11px;
-  cursor: pointer;
-  transition: background .2s;
-}
-.wuc-sl::before {
-  content: "";
-  position: absolute;
-  width: 16px; height: 16px;
-  left: 3px; top: 3px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform .2s;
-}
+.wuc-sl { position: absolute; inset: 0; background: rgba(255,255,255,.2); border-radius: 11px; cursor: pointer; transition: background .2s; }
+.wuc-sl::before { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform .2s; }
 .wuc-sw input:checked + .wuc-sl { background: #4caf50; }
 .wuc-sw input:checked + .wuc-sl::before { transform: translateX(16px); }
 
 /* ── 按钮 ── */
-.wuc-btn-primary, .wuc-btn-sec, .wuc-btn-cancel {
-  border: none;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: opacity .15s;
+.wuc-primary-btn, .wuc-sec-btn, .wuc-mini-btn {
+  border: none; border-radius: 6px;
+  padding: 7px 14px; font-size: 13px; cursor: pointer;
 }
-.wuc-btn-primary { background: #4caf50; color: #fff; }
-.wuc-btn-sec     { background: rgba(255,255,255,.12); color: inherit; }
-.wuc-btn-cancel  { background: rgba(220,80,80,.3); color: #f88; font-size: 12px; padding: 5px 10px; }
-.wuc-btn-cancel:disabled { opacity: .35; cursor: default; }
-.wuc-btn-primary:active, .wuc-btn-sec:active { opacity: .7; }
+.wuc-primary-btn { background: #4caf50; color: #fff; }
+.wuc-sec-btn     { background: rgba(255,255,255,.12); color: inherit; }
+.wuc-mini-btn    { background: rgba(220,80,80,.3); color: #f99; font-size: 12px; padding: 4px 10px; }
+.wuc-mini-btn:disabled { opacity: .35; cursor: default; }
+
+/* ── 底部行 ── */
+.wuc-footer {
+  display: flex; align-items: center;
+  gap: 8px; padding: 8px 0 4px;
+  justify-content: flex-end;
+}
 
 /* ── 消息提示 ── */
-.wuc-msg { font-size: 12px; min-height: 16px; transition: color .2s; }
-.wuc-msg.wuc-ok  { color: #4caf50; }
-.wuc-msg.wuc-err { color: #f06060; }
-
-/* ── 底部操作行 ── */
-.wuc-footer {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 4px;
-}
+.wuc-tip { font-size: 12px; flex: 1; }
+.wuc-tip.wuc-ok  { color: #4caf50; }
+.wuc-tip.wuc-err { color: #f06060; }
