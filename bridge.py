@@ -1,17 +1,17 @@
-#!/data/data/com.termux/files/usr/bin/python3
+!/data/data/com.termux/files/usr/bin/python3
 # ============================================================
-#  wake_bridge.py — Wake-Up 桥（Termux 本地 HTTP 服务）
+#  wake_bridge.py v2.0 — Wake-Up 桥（Termux 本地 HTTP 服务）
 #  ------------------------------------------------------------
 #  端点：
-#    GET  /ping                         健康检查
-#    GET  /schedule?key=&ts=<毫秒>&text= 设定提醒（普通通知弹窗）
-#    GET  /cancel?key=                  取消提醒
-#    GET  /event?key=                   读取"已醒来"事件（酒馆前端补注入用）
-#    GET  /event-consume?key=           消费事件（清除）
-#    POST /cache?key=                   保存角色缓存
-#    POST /config?key=                  保存配置（密钥 + AI API，来自酒馆扩展）
+#    GET  /ping                              健康检查
+#    GET  /schedule?key=&ts=<毫秒>&text=&alarm=1  设定提醒
+#    GET  /cancel?key=                       取消提醒
+#    GET  /event?key=                        读取"已醒来"事件
+#    GET  /event-consume?key=                消费事件（清除）
+#    POST /cache?key=                        保存角色+聊天缓存
+#    POST /config?key=                       保存配置
 #  ------------------------------------------------------------
-#  配置文件：~/wakeup_config.json（由 setup.sh 生成、酒馆扩展同步）
+#  配置文件：~/wakeup_config.json
 #  启动：python3 ~/bin/wake_bridge.py
 #  常驻：nohup python3 ~/bin/wake_bridge.py > ~/wake_bridge.log 2>&1 &
 # ============================================================
@@ -25,26 +25,19 @@ from urllib.parse import urlparse, parse_qs
 PORT = 8765
 JOB_ID = 4217
 CONFIG_FILE = os.path.expanduser("~/wakeup_config.json")
-CACHE_FILE = os.path.expanduser("~/wakeup_cache.json")
-EVENT_FILE = os.path.expanduser("~/wakeup_event.json")
-JOB_SCRIPT = os.path.expanduser("~/bin/wake_job.sh")
-
-# 是否同时调起系统闹钟（默认 False = 只弹普通通知）
-ALARM_ENABLED = False
+CACHE_FILE  = os.path.expanduser("~/wakeup_cache.json")
+EVENT_FILE  = os.path.expanduser("~/wakeup_event.json")
+JOB_SCRIPT  = os.path.expanduser("~/bin/wake_job.sh")
 
 DEFAULTS = {
-    "bridge_key": "wake-2026",
-    "api_wake_key": "wake-2026",
-    "api_base": "",
-    "api_key": "",
-    "model": "",
-    "gen_mode": "auto",
+    "bridge_key":      "wake-2026",
+    "gen_mode":        "auto",
     "gen_custom_text": "",
-    "gen_character": "",
-    "gen_worldinfo": "",
+    "gen_character":   "",
+    "gen_worldinfo":   "",
 }
 
-
+# ── 配置读写 ────────────────────────────────────────────────
 def load_config():
     cfg = dict(DEFAULTS)
     try:
@@ -56,7 +49,6 @@ def load_config():
         pass
     return cfg
 
-
 def save_config(data):
     cfg = load_config()
     cfg.update({k: v for k, v in data.items() if k in DEFAULTS})
@@ -64,31 +56,32 @@ def save_config(data):
         json.dump(cfg, f, ensure_ascii=False, indent=2)
     return cfg
 
-
 def log(msg):
     print(f"[{datetime.datetime.now():%H:%M:%S}] {msg}", flush=True)
 
-
-def set_system_alarm(ts):
-    dt = datetime.datetime.fromtimestamp(ts / 1000)
+# ── 系统闹钟（通过 Android am 命令）──────────────────────────
+def set_system_alarm(ts_ms):
+    dt = datetime.datetime.fromtimestamp(ts_ms / 1000)
     cmd = [
         "am", "start",
         "-a", "android.intent.action.SET_ALARM",
-        "--ei", "android.intent.extra.alarm.HOUR", str(dt.hour),
+        "--ei", "android.intent.extra.alarm.HOUR",    str(dt.hour),
         "--ei", "android.intent.extra.alarm.MINUTES", str(dt.minute),
-        "--es", "android.intent.extra.alarm.MESSAGE", "起床啦",
+        "--es", "android.intent.extra.alarm.MESSAGE", "起床啦～",
+        "--ez", "android.intent.extra.alarm.SKIP_UI", "true",
     ]
     try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        log(f"系统闹钟 → {dt:%H:%M}  {r.stderr.strip() or 'ok'}")
     except Exception as e:
         log(f"设置系统闹钟失败: {e}")
 
-
+# ── Termux Job Scheduler ─────────────────────────────────────
 def schedule_job(timestamp_ms):
     cmd = [
         "termux-job-scheduler",
-        "--job-id", str(JOB_ID),
-        "--timestamp", str(timestamp_ms),
+        "--job-id",      str(JOB_ID),
+        "--timestamp",   str(timestamp_ms),
         "--script-path", JOB_SCRIPT,
     ]
     try:
@@ -97,62 +90,66 @@ def schedule_job(timestamp_ms):
     except Exception as e:
         log(f"注册定时任务失败: {e}")
 
-
 def cancel_job():
-    cmd = ["termux-job-scheduler", "--cancel", str(JOB_ID)]
     try:
-        subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        subprocess.run(
+            ["termux-job-scheduler", "--cancel", str(JOB_ID)],
+            capture_output=True, text=True, timeout=15
+        )
         return True
     except Exception as e:
         log(f"取消任务失败: {e}")
         return False
 
-
+# ── HTTP 处理器 ───────────────────────────────────────────────
 class Handler(BaseHTTPRequestHandler):
+
     def _key_ok(self, q):
         return q.get("key", [""])[0] == load_config()["bridge_key"]
 
     def do_GET(self):
-        q = parse_qs(urlparse(self.path).query)
+        parsed = urlparse(self.path)
+        q = parse_qs(parsed.query)
+        path = parsed.path
 
-        if self.path.startswith("/ping"):
-            self.reply(200, {"ok": True, "deployed": True, "config": os.path.exists(CONFIG_FILE)})
+        # 健康检查
+        if path == "/ping":
+            self.reply(200, {"ok": True, "version": "2.0", "config": os.path.exists(CONFIG_FILE)})
+            return
 
-        elif self.path.startswith("/schedule"):
-            if not self._key_ok(q):
-                self.reply(403, {"ok": False, "error": "bad key"})
-                return
+        if not self._key_ok(q):
+            self.reply(403, {"ok": False, "error": "bad key"})
+            return
+
+        # 设定提醒
+        if path == "/schedule":
             try:
                 ts = int(q["ts"][0])
             except Exception:
-                self.reply(400, {"ok": False, "error": "bad ts"})
-                return
-            if ts < int(datetime.datetime.now().timestamp() * 1000):
-                self.reply(400, {"ok": False, "error": "ts in the past"})
-                return
-            text = q.get("text", [""])[0]
-            if ALARM_ENABLED:
+                self.reply(400, {"ok": False, "error": "bad ts"}); return
+            now_ms = int(datetime.datetime.now().timestamp() * 1000)
+            if ts <= now_ms:
+                self.reply(400, {"ok": False, "error": "ts in the past"}); return
+
+            text      = q.get("text",  [""])[0]
+            use_alarm = q.get("alarm", ["0"])[0] == "1"
+
+            if use_alarm:
                 set_system_alarm(ts)
             schedule_job(ts)
+
             target = datetime.datetime.fromtimestamp(ts / 1000)
-            log(f"已设定提醒 {target:%m-%d %H:%M}（{text}）")
+            log(f"已设定提醒 {target:%m-%d %H:%M}（{text}，系统闹钟={'开' if use_alarm else '关'}）")
             self.reply(200, {"ok": True, "target": target.strftime("%Y-%m-%d %H:%M")})
 
-        elif self.path.startswith("/event-consume"):
-            if not self._key_ok(q):
-                self.reply(403, {"ok": False, "error": "bad key"})
-                return
-            try:
-                os.remove(EVENT_FILE)
-            except Exception:
-                pass
-            log("醒来事件已消费")
-            self.reply(200, {"ok": True})
+        # 取消提醒
+        elif path == "/cancel":
+            ok = cancel_job()
+            log("提醒已取消")
+            self.reply(200, {"ok": ok})
 
-        elif self.path.startswith("/event"):
-            if not self._key_ok(q):
-                self.reply(403, {"ok": False, "error": "bad key"})
-                return
+        # 读取醒来事件
+        elif path == "/event":
             try:
                 with open(EVENT_FILE, encoding="utf-8") as f:
                     data = json.load(f)
@@ -160,50 +157,46 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self.reply(200, {"ok": True, "text": ""})
 
-        elif self.path.startswith("/cancel"):
-            if not self._key_ok(q):
-                self.reply(403, {"ok": False, "error": "bad key"})
-                return
-            ok = cancel_job()
-            log("提醒已取消")
-            self.reply(200, {"ok": ok})
+        # 消费醒来事件
+        elif path == "/event-consume":
+            try:
+                os.remove(EVENT_FILE)
+            except Exception:
+                pass
+            log("醒来事件已消费")
+            self.reply(200, {"ok": True})
 
         else:
             self.reply(404, {"ok": False, "error": "not found"})
 
     def do_POST(self):
-        q = parse_qs(urlparse(self.path).query)
+        parsed = urlparse(self.path)
+        q = parse_qs(parsed.query)
+        path = parsed.path
 
-        if self.path.startswith("/cache"):
-            if not self._key_ok(q):
-                self.reply(403, {"ok": False, "error": "bad key"})
-                return
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                data = json.loads(self.rfile.read(length).decode("utf-8"))
-            except Exception:
-                self.reply(400, {"ok": False, "error": "bad body"})
-                return
+        if not self._key_ok(q):
+            self.reply(403, {"ok": False, "error": "bad key"}); return
+
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body   = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            self.reply(400, {"ok": False, "error": "bad body"}); return
+
+        # 保存角色+聊天缓存
+        if path == "/cache":
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            hist = len(data.get("history", []))
-            char = (data.get("character") or {}).get("name", "未知角色")
-            log(f"角色缓存已更新: {CACHE_FILE}（角色={char}，历史 {hist} 条）")
+                json.dump(body, f, ensure_ascii=False, indent=2)
+            char = (body.get("character") or {}).get("name", "未知角色")
+            hist = len(body.get("history", []))
+            log(f"缓存已更新：角色={char}，历史={hist}条，生成方式={body.get('genMode','?')}")
             self.reply(200, {"ok": True})
 
-        elif self.path.startswith("/config"):
-            if not self._key_ok(q):
-                self.reply(403, {"ok": False, "error": "bad key"})
-                return
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                data = json.loads(self.rfile.read(length).decode("utf-8"))
-            except Exception:
-                self.reply(400, {"ok": False, "error": "bad body"})
-                return
-            cfg = save_config(data)
-            log("配置已同步（密钥 + AI API）")
-            self.reply(200, {"ok": True, "config": {k: cfg[k] for k in ("bridge_key", "api_wake_key")}})
+        # 保存配置
+        elif path == "/config":
+            cfg = save_config(body)
+            log(f"配置已同步：gen_mode={cfg.get('gen_mode')}，char={cfg.get('gen_character') or '(全局)'}")
+            self.reply(200, {"ok": True, "config": {"bridge_key": cfg["bridge_key"]}})
 
         else:
             self.reply(404, {"ok": False, "error": "not found"})
@@ -211,16 +204,21 @@ class Handler(BaseHTTPRequestHandler):
     def reply(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type",   "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
     def log_message(self, *args):
-        pass
+        pass   # 静默 HTTP 访问日志，只保留 log() 输出
 
 
 if __name__ == "__main__":
     cfg = load_config()
-    log(f"Wake-Up 桥已启动: http://127.0.0.1:{PORT}（系统闹钟={'开' if ALARM_ENABLED else '关'}）")
-    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    log(f"Wake-Up 桥 v2.0 已启动: http://127.0.0.1:{PORT}")
+    log(f"密钥={cfg['bridge_key']}，生成方式={cfg['gen_mode']}")
+    try:
+        HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    except KeyboardInterrupt:
+        log("已停止")
