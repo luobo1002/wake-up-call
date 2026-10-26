@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  var DEBUG = true; // 改成 true 可开启 alert 调试弹窗
+  var DEBUG = false; // 改成 true 可开启 alert 调试弹窗
   function dbg(msg) { if (DEBUG) alert(msg); }
 
   /* ═══════════════════════════════════════════════════════════
@@ -342,35 +342,6 @@
       }
     });
     document.body.appendChild(fab);
-    dbg("[WUC] 底部按钮已挂载");
-    if (DEBUG && !document.getElementById("wuc-tap-diag")) {
-      var diagFlag = document.createElement("div");
-      diagFlag.id = "wuc-tap-diag";
-      diagFlag.style.display = "none";
-      document.body.appendChild(diagFlag);
-      document.addEventListener("pointerup", function (ev) {
-        try {
-          var fb = document.getElementById("wuc-fab");
-          if (!fb) return;
-          var r2 = fb.getBoundingClientRect();
-          var x = ev.clientX, y = ev.clientY;
-          if (x >= r2.left - 30 && x <= r2.right + 30 && y >= r2.top - 30 && y <= r2.bottom + 30) {
-            var t = ev.target;
-            alert("[WUC-TAP] 点击点(" + Math.round(x) + "," + Math.round(y) + ") 实际命中: <" + t.tagName + "> id=" + (t.id || "无") + " class=" + (typeof t.className === "string" ? t.className.slice(0, 60) : ""));
-          }
-        } catch (e3) {}
-      }, true);
-      setTimeout(function () {
-        try {
-          var r = fab.getBoundingClientRect();
-          var el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-          var path = [];
-          var p = el;
-          while (p && path.length < 4) { path.push(p.tagName + (p.id ? "#" + p.id : "")); p = p.parentElement; }
-          alert("[WUC-DIAG] fab位置: left=" + Math.round(r.left) + " top=" + Math.round(r.top) + " size=" + Math.round(r.width) + "x" + Math.round(r.height) + " | 该点最顶层元素: " + (el ? el.tagName + (el.id ? "#" + el.id : "") : "null") + " | 祖先链: " + path.join(" < "));
-        } catch (e2) { alert("[WUC-DIAG-ERR] " + e2.message); }
-      }, 2000);
-    }
     console.log("[WUC] FAB mounted");
   }
 
