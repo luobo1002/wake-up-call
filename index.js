@@ -1,5 +1,5 @@
 // ============================================================
-//  Wake-Up Call v6.1 — SillyTavern 独立扩展
+//  Wake-Up Call v6.2.1 — SillyTavern 独立扩展
 //  UI：底部固定按钮 + 居中模态弹窗（遮罩 + 关闭按钮）
 //  修复：CSS 由 JS 内联注入（不依赖 manifest css 字段）
 //  修复：按钮位置上移，避开 SillyDroid 悬浮控件
@@ -331,7 +331,7 @@
     fab.id = "wuc-fab";
     fab.type = "button";
     fab.title = "Wake-Up Call";
-    fab.style.cssText = "position:fixed!important;right:16px!important;bottom:96px!important;z-index:2147483647!important;width:56px;height:56px;border-radius:50%;background:#22c55e;color:#fff;border:none;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;margin:0;padding:0;line-height:1;-webkit-tap-highlight-color:transparent;";
+    fab.style.cssText = "position:fixed!important;right:16px!important;top:calc(100vh - 152px)!important;bottom:auto!important;z-index:2147483647!important;width:56px;height:56px;border-radius:50%;background:#22c55e;color:#fff;border:none;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;margin:0;padding:0;line-height:1;-webkit-tap-highlight-color:transparent;";
     fab.innerHTML = '<span>🔔</span><span id="wuc-fab-dot" class="wuc-fab-dot" style="display:none"></span>';
     fab.addEventListener("click", function () {
       if (document.getElementById("wuc-modal-root")) closeModal(); else openModal();
@@ -410,8 +410,8 @@
     document.body.appendChild(root);
     var _mask = root.querySelector("#wuc-mask");
     var _modal = root.querySelector("#wuc-modal");
-    if (_mask) _mask.style.cssText = "position:fixed!important;inset:0!important;background:rgba(0,0,0,.55)!important;z-index:2147483646!important;";
-    if (_modal) _modal.style.cssText = "position:fixed!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:min(92vw,420px)!important;max-height:86vh!important;overflow-y:auto!important;background:#1f2430!important;color:#e6e6e6!important;border-radius:16px!important;z-index:2147483647!important;padding:16px!important;box-sizing:border-box!important;box-shadow:0 10px 40px rgba(0,0,0,.5)!important;";
+    if (_mask) _mask.style.cssText = "position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;background:rgba(0,0,0,.55)!important;z-index:2147483646!important;";
+    if (_modal) _modal.style.cssText = "position:fixed!important;left:50vw!important;top:50vh!important;transform:translate(-50%,-50%)!important;width:min(92vw,420px)!important;max-height:86vh!important;overflow-y:auto!important;background:#1f2430!important;color:#e6e6e6!important;border-radius:16px!important;z-index:2147483647!important;padding:16px!important;box-sizing:border-box!important;box-shadow:0 10px 40px rgba(0,0,0,.5)!important;";
     // 填充含特殊字符的值（避免 innerHTML 转义问题）
     root.querySelector("#wuc-custom-ta").value = cfg.genCustomText;
     root.querySelector("#wuc-msg-ta").value = cfg.wakeMessage;
@@ -582,7 +582,7 @@
       setTimeout(function () { tryMount(); ob.disconnect(); }, 8000);
     }
 
-    console.log("[WUC] Wake-Up Call v6.1 已就绪");
+    console.log("[WUC] Wake-Up Call v6.2.1 已就绪");
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
