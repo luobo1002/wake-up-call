@@ -421,7 +421,7 @@
           "<label>世界书条目</label>" +
           '<select id="wuc-wb-sel" class="wuc-sel"><option value="">— 选择条目 —</option>' +
           wbEntries.map(function (e) {
-            return '<option value="' + e.uid + '" data-content="' + (e.content || "").replace(/"/g, "&quot;") + '" ' + (cfg.genWorldbookUid === e.uid ? "selected" : "") + ">" + e.label + "</option>";
+            return '<option value="' + e.uid + '" data-content="' + String(e.content || "").replace(/"/g, "&quot;") + '" ' + (cfg.genWorldbookUid === e.uid ? "selected" : "") + ">" + e.label + "</option>";
           }).join("") +
           "</select></div>" +
         '<div id="wuc-custom-row" class="wuc-field" style="display:' + (cfg.genMode === "custom" ? "block" : "none") + '">' +
@@ -563,10 +563,13 @@
         if (!es) continue;
         for (var uid in es) {
           var e = es[uid];
+          var c = e?.content;
+          if (c == null) c = "";
+          else if (typeof c !== "string") { try { c = JSON.stringify(c); } catch (_e) { c = String(c); } }
           entries.push({
             uid: uid,
             label: e?.comment || (Array.isArray(e?.key) ? e.key.join(", ") : uid),
-            content: e?.content ?? ""
+            content: c
           });
         }
       }
