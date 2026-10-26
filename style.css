@@ -1,100 +1,123 @@
-/* Wake-Up Call v5.0 — 内联抽屉样式 */
+/* Wake-Up Call v6.0 — 底部固定按钮 + 居中模态弹窗 */
 
-/* ── 触发按钮（发送栏旁） ── */
-#wuc-trigger-btn {
-  position: relative;
-  display: inline-flex;
+/* ── 底部固定圆形按钮 ── */
+#wuc-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 9998;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .45);
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 20px;
-  background: transparent;
-  transition: background .15s;
-  flex-shrink: 0;
-  user-select: none;
 }
-#wuc-trigger-btn:hover,
-#wuc-trigger-btn:active { background: rgba(255,255,255,.12); }
+#wuc-fab:active { transform: scale(.94); }
 
-.wuc-btn-dot {
+.wuc-fab-dot {
   position: absolute;
-  top: 5px; right: 5px;
-  width: 8px; height: 8px;
-  background: #4caf50;
+  top: 4px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  background: #ffe14d;
   border-radius: 50%;
-  border: 1px solid rgba(0,0,0,.4);
+  border: 1px solid rgba(0, 0, 0, .5);
 }
 
-/* ── 内联抽屉 ── */
-#wuc-drawer {
-  width: 100%;
-  background: var(--SmartThemeBlurTintColor, rgba(30,30,40,.97));
-  border-bottom: 1px solid rgba(255,255,255,.1);
+/* ── 遮罩层 ── */
+.wuc-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  z-index: 9999;
+}
+
+/* ── 居中模态弹窗 ── */
+.wuc-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 440px);
+  max-height: 82vh;
+  overflow-y: auto;
+  background: #1f1f28;
+  color: #e2e2ea;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .6);
+  z-index: 10000;
+  padding: 14px 16px;
   box-sizing: border-box;
-  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   font-size: 14px;
-  color: var(--SmartThemeBodyColor, #ccc);
-  /* 非 fixed，跟随文档流，键盘弹起不影响 */
 }
 
-/* ── 抽屉标题栏 ── */
-.wuc-drawer-header {
+/* ── 弹窗头部 ── */
+.wuc-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
-  font-size: 15px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255,255,255,.1);
+  font-size: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
 }
 .wuc-close-btn {
-  background: none; border: none;
-  color: var(--SmartThemeBodyColor, #ccc);
-  font-size: 16px; cursor: pointer;
-  padding: 2px 6px; border-radius: 4px;
-  line-height: 1;
+  background: none;
+  border: none;
+  color: #e2e2ea;
+  font-size: 17px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  line-height: 1.2;
 }
-.wuc-close-btn:hover { background: rgba(255,255,255,.1); }
+.wuc-close-btn:hover { background: rgba(255, 255, 255, .12); }
 
 /* ── 状态栏 ── */
 .wuc-status-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .1);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   gap: 8px;
 }
 .wuc-status-bar.wuc-armed {
-  background: rgba(76,175,80,.15);
-  border-color: rgba(76,175,80,.4);
+  background: rgba(76, 175, 80, .16);
+  border-color: rgba(76, 175, 80, .45);
 }
 #wuc-status-text { flex: 1; font-size: 13px; }
 
-/* ── 快捷按钮行 ── */
+/* ── 快捷按钮 ── */
 .wuc-quick-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 .wuc-q {
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 7px;
   color: inherit;
-  padding: 8px 4px;
+  padding: 9px 4px;
   font-size: 13px;
   cursor: pointer;
 }
-.wuc-q:active { background: rgba(255,255,255,.2); }
+.wuc-q:active { background: rgba(255, 255, 255, .2); }
 
 /* ── 时间选择行 ── */
 .wuc-row {
@@ -104,45 +127,25 @@
 }
 .wuc-row input[type="time"] {
   flex: 1;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 7px;
   color: inherit;
-  padding: 7px 8px;
+  padding: 8px;
   font-size: 14px;
 }
-
-/* ── details/summary 折叠 ── */
-.wuc-details {
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 8px;
-  padding: 0;
-  overflow: hidden;
-}
-.wuc-details > summary {
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  background: rgba(255,255,255,.05);
-  user-select: none;
-  list-style: none;
-}
-.wuc-details > summary::-webkit-details-marker { display: none; }
-.wuc-details[open] > summary { border-bottom: 1px solid rgba(255,255,255,.1); }
-.wuc-details > :not(summary) { padding: 0 10px; }
 
 /* ── 设置字段 ── */
 .wuc-field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255,255,255,.05);
+  gap: 4px;
+  padding: 5px 0;
 }
-.wuc-field:last-of-type { border-bottom: none; }
-.wuc-field > label, .wuc-field > span:first-child {
+.wuc-field > label,
+.wuc-field > span:first-child {
   font-size: 12px;
-  color: var(--SmartThemeEmColor, #aaa);
+  color: #9a9aad;
 }
 .wuc-switch-row {
   flex-direction: row !important;
@@ -152,44 +155,64 @@
 
 /* ── 表单控件 ── */
 .wuc-inp, .wuc-sel, .wuc-ta {
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 7px;
   color: inherit;
-  padding: 6px 8px;
+  padding: 7px 9px;
   font-size: 13px;
   width: 100%;
   box-sizing: border-box;
 }
-.wuc-ta { resize: vertical; min-height: 48px; font-family: inherit; }
-.wuc-sel option { background: #222; }
+.wuc-ta { resize: vertical; min-height: 50px; font-family: inherit; }
+.wuc-sel option { background: #22222b; }
 
-/* ── Toggle ── */
-.wuc-sw { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+/* ── Toggle 开关 ── */
+.wuc-sw { position: relative; display: inline-block; width: 40px; height: 23px; flex-shrink: 0; }
 .wuc-sw input { opacity: 0; width: 0; height: 0; }
-.wuc-sl { position: absolute; inset: 0; background: rgba(255,255,255,.2); border-radius: 11px; cursor: pointer; transition: background .2s; }
-.wuc-sl::before { content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:transform .2s; }
+.wuc-sl {
+  position: absolute; inset: 0;
+  background: rgba(255, 255, 255, .22);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.wuc-sl::before {
+  content: "";
+  position: absolute;
+  width: 17px; height: 17px;
+  left: 3px; top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+}
 .wuc-sw input:checked + .wuc-sl { background: #4caf50; }
-.wuc-sw input:checked + .wuc-sl::before { transform: translateX(16px); }
+.wuc-sw input:checked + .wuc-sl::before { transform: translateX(17px); }
 
 /* ── 按钮 ── */
 .wuc-primary-btn, .wuc-sec-btn, .wuc-mini-btn {
-  border: none; border-radius: 6px;
-  padding: 7px 14px; font-size: 13px; cursor: pointer;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 15px;
+  font-size: 13px;
+  cursor: pointer;
 }
 .wuc-primary-btn { background: #4caf50; color: #fff; }
-.wuc-sec-btn     { background: rgba(255,255,255,.12); color: inherit; }
-.wuc-mini-btn    { background: rgba(220,80,80,.3); color: #f99; font-size: 12px; padding: 4px 10px; }
+.wuc-sec-btn     { background: rgba(255, 255, 255, .13); color: inherit; }
+.wuc-mini-btn    { background: rgba(220, 80, 80, .32); color: #f99; font-size: 12px; padding: 5px 11px; }
 .wuc-mini-btn:disabled { opacity: .35; cursor: default; }
+.wuc-primary-btn:active, .wuc-sec-btn:active { opacity: .75; }
 
 /* ── 底部行 ── */
 .wuc-footer {
-  display: flex; align-items: center;
-  gap: 8px; padding: 8px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
   justify-content: flex-end;
 }
 
-/* ── 消息提示 ── */
+/* ── 提示 ── */
 .wuc-tip { font-size: 12px; flex: 1; }
 .wuc-tip.wuc-ok  { color: #4caf50; }
 .wuc-tip.wuc-err { color: #f06060; }
