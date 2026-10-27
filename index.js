@@ -353,55 +353,79 @@
     function vh() { return window.innerHeight || 800; }
     function clampX(v, w) { return Math.max(8, Math.min(vw() - w - 8, v)); }
     function clampY(v, h) { return Math.max(8, Math.min(vh() - h - 8, v)); }
+    function setBase(xPx, yPx) {
+      fab.style.left = (xPx / vw() * 100) + "vw";
+      fab.style.top = (yPx / vh() * 100) + "vh";
+      fab.style.right = "auto";
+      fab.style.bottom = "auto";
+    }
     function onMove(e) {
       if (!st) return;
       var dx = e.clientX - st.sx, dy = e.clientY - st.sy;
       if (!st.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) st.moved = true;
       if (!st.moved) return;
       if (e.cancelable) e.preventDefault();
-      var nx = clampX(st.ox + dx, st.w), ny = clampY(st.oy + dy, st.h);
-      fab.style.left = (nx / vw() * 100) + "vw";
-      fab.style.top = (ny / vh() * 100) + "vh";
-      fab.style.right = "auto";
-      fab.style.bottom = "auto";
+      st.dx = dx; st.dy = dy;
+      fab.style.transform = "translate3d(" + dx + "px," + dy + "px,0)";
     }
     function onUp(e) {
       if (!st) return;
       var moved = st.moved;
-      var r = fab.getBoundingClientRect();
-      var cx = r.left + r.width / 2;
+      var dx = st.dx || 0, dy = st.dy || 0;
+      var w = st.w, h = st.h;
+      var vx = clampX(st.ox + dx, w), vy = clampY(st.oy + dy, h);
+      // 先把基础位置钉在当前视觉位置，同时去掉 transform（同步块内不会闪跳）
+      fab.style.transform = "none";
+      fab.style.willChange = "auto";
+      setBase(vx, vy);
+      // 计算吸附目标
+      var cx = vx + w / 2;
       var snapRight = cx >= vw() / 2;
-      var ny = clampY(r.top, r.height);
-      fab.style.transition = "left .25s ease, top .25s ease";
-      if (snapRight) {
-        fab.style.left = "calc(100vw - " + (r.width + 8) + "px)";
-        fab.style.right = "auto";
-      } else {
-        fab.style.left = "8px";
-        fab.style.right = "auto";
-      }
-      fab.style.top = (ny / vh() * 100) + "vh";
+      var ty = clampY(vy, h);
+      var tx = snapRight ? (vw() - w - 8) : 8;
+      // 强制 reflow 后启用过渡，做一次短平滑吸附
+      void fab.offsetWidth;
+      fab.style.transition = "left .22s cubic-bezier(.2,.7,.3,1), top .22s cubic-bezier(.2,.7,.3,1)";
+      setBase(tx, ty);
       st = null;
+      document.removeEventListener("pointermove", onMove, true);
+      document.removeEventListener("pointerup", onUp, true);
+      document.removeEventListener("pointercancel", onCancel, true);
+      // 吸附结束后恢复磨砂（避免拖动时毛玻璃每帧重渲染造成卡顿）
+      setTimeout(function () {
+        fab.style.transition = "none";
+        fab.style.willChange = "auto";
+        fab.style.webkitBackdropFilter = "blur(12px) saturate(140%)";
+        fab.style.backdropFilter = "blur(12px) saturate(140%)";
+      }, 260);
       if (moved) {
         fab.dataset.wucNoClick = "1";
         setTimeout(function () { fab.dataset.wucNoClick = "0"; }, 300);
       }
     }
-    fab.addEventListener("pointerdown", function (e) {
-      if (e.button !== undefined && e.button !== 0) return;
-      var r = fab.getBoundingClientRect();
-      st = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, w: r.width, h: r.height, moved: false };
-      fab.style.transition = "none";
-      document.addEventListener("pointermove", onMove, true);
-      document.addEventListener("pointerup", onUp, true);
-      document.addEventListener("pointercancel", onCancel, true);
-    });
     function onCancel() {
+      fab.style.transform = "none";
+      fab.style.willChange = "auto";
+      fab.style.webkitBackdropFilter = "blur(12px) saturate(140%)";
+      fab.style.backdropFilter = "blur(12px) saturate(140%)";
       document.removeEventListener("pointermove", onMove, true);
       document.removeEventListener("pointerup", onUp, true);
       document.removeEventListener("pointercancel", onCancel, true);
       st = null;
     }
+    fab.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      var r = fab.getBoundingClientRect();
+      st = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, w: r.width, h: r.height, moved: false, dx: 0, dy: 0 };
+      // 拖动期间：关毛玻璃、开 GPU 合成，消除卡顿源
+      fab.style.transition = "none";
+      fab.style.willChange = "transform";
+      fab.style.webkitBackdropFilter = "none";
+      fab.style.backdropFilter = "none";
+      document.addEventListener("pointermove", onMove, { capture: true, passive: false });
+      document.addEventListener("pointerup", onUp, { capture: true, passive: false });
+      document.addEventListener("pointercancel", onCancel, { capture: true, passive: false });
+    });
   }
 
   function openModal() {
