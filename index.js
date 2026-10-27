@@ -14,8 +14,8 @@
    *  CSS 内联注入（双保险：即使 manifest 的 css 不被加载也能生效）
    * ═══════════════════════════════════════════════════════════ */
   var WUC_CSS = [
-    "#wuc-fab{position:fixed;right:16px;bottom:96px;width:52px;height:52px;border-radius:50%;background:#4caf50;color:#fff;border:none;font-size:22px;cursor:pointer;z-index:2147483647;box-shadow:0 4px 12px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}",
-    "#wuc-fab:active{transform:scale(.94)}",
+    "#wuc-fab{position:fixed;right:16px;width:56px;height:56px;border-radius:50%;background:rgba(135,206,235,.45);color:#fff;border:1px solid rgba(255,255,255,.6);font-size:26px;cursor:pointer;z-index:2147483647;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);touch-action:none;-webkit-user-select:none;user-select:none}",
+    "#wuc-fab:active{filter:brightness(1.08)}",
     ".wuc-fab-dot{position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#ffeb3b;border:2px solid #fff}",
     ".wuc-mask{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2147483647}",
     ".wuc-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,420px);max-height:82vh;overflow-y:auto;background:var(--SmartThemeBlurTintColor,#1e222a);color:var(--SmartThemeBodyColor,#ddd);border:1px solid var(--SmartThemeBorderColor,#444);border-radius:12px;padding:14px;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,.6);font-size:14px;display:flex;flex-direction:column;gap:10px}",
@@ -331,9 +331,10 @@
     fab.id = "wuc-fab";
     fab.type = "button";
     fab.title = "Wake-Up Call";
-    fab.style.cssText = "position:fixed!important;right:16px!important;top:calc(100vh - 152px)!important;bottom:auto!important;z-index:2147483647!important;width:56px;height:56px;border-radius:50%;background:#22c55e;color:#fff;border:none;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;margin:0;padding:0;line-height:1;-webkit-tap-highlight-color:transparent;";
+    fab.style.cssText = "position:fixed!important;right:16px!important;left:auto!important;top:calc(100vh - 152px)!important;bottom:auto!important;z-index:2147483647!important;width:56px;height:56px;border-radius:50%;background:rgba(135,206,235,.45)!important;color:#fff!important;border:1px solid rgba(255,255,255,.6)!important;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.25)!important;cursor:pointer;margin:0;padding:0;line-height:1;-webkit-tap-highlight-color:transparent;-webkit-backdrop-filter:blur(12px) saturate(140%)!important;backdrop-filter:blur(12px) saturate(140%)!important;touch-action:none!important;-webkit-user-select:none!important;user-select:none!important;";
     fab.innerHTML = '<span>🔔</span><span id="wuc-fab-dot" class="wuc-fab-dot" style="display:none"></span>';
-    fab.addEventListener("click", function () {
+    fab.addEventListener("click", function (e) {
+      if (fab.dataset.wucNoClick === "1") { e.preventDefault(); return; }
       try {
         if (document.getElementById("wuc-modal-root")) closeModal(); else openModal();
       } catch (err) {
@@ -341,8 +342,61 @@
         console.error("[WUC]", err);
       }
     });
+    bindFabDrag(fab);
     document.body.appendChild(fab);
     console.log("[WUC] FAB mounted");
+  }
+
+  function bindFabDrag(fab) {
+    var st = null;
+    function vw() { return window.innerWidth || 400; }
+    function vh() { return window.innerHeight || 800; }
+    function clampX(v, w) { return Math.max(8, Math.min(vw() - w - 8, v)); }
+    function clampY(v, h) { return Math.max(8, Math.min(vh() - h - 8, v)); }
+    fab.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      var r = fab.getBoundingClientRect();
+      st = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, w: r.width, h: r.height, moved: false };
+      fab.style.transition = "none";
+      try { fab.setPointerCapture && fab.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    fab.addEventListener("pointermove", function (e) {
+      if (!st) return;
+      var dx = e.clientX - st.sx, dy = e.clientY - st.sy;
+      if (!st.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) st.moved = true;
+      if (!st.moved) return;
+      if (e.cancelable) e.preventDefault();
+      var nx = clampX(st.ox + dx, st.w), ny = clampY(st.oy + dy, st.h);
+      fab.style.left = (nx / vw() * 100) + "vw";
+      fab.style.top = (ny / vh() * 100) + "vh";
+      fab.style.right = "auto";
+      fab.style.bottom = "auto";
+    });
+    function finish(e) {
+      if (!st) return;
+      var moved = st.moved;
+      var r = fab.getBoundingClientRect();
+      var cx = r.left + r.width / 2;
+      var snapRight = cx >= vw() / 2;
+      var ny = clampY(r.top, r.height);
+      fab.style.transition = "left .25s ease, top .25s ease";
+      if (snapRight) {
+        fab.style.left = "calc(100vw - " + (r.width + 8) + "px)";
+        fab.style.right = "auto";
+      } else {
+        fab.style.left = "8px";
+        fab.style.right = "auto";
+      }
+      fab.style.top = (ny / vh() * 100) + "vh";
+      try { fab.releasePointerCapture && fab.releasePointerCapture(e.pointerId); } catch (_) {}
+      st = null;
+      if (moved) {
+        fab.dataset.wucNoClick = "1";
+        setTimeout(function () { fab.dataset.wucNoClick = "0"; }, 300);
+      }
+    }
+    fab.addEventListener("pointerup", finish);
+    fab.addEventListener("pointercancel", function () { st = null; });
   }
 
   function openModal() {
