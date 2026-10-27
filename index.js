@@ -353,14 +353,7 @@
     function vh() { return window.innerHeight || 800; }
     function clampX(v, w) { return Math.max(8, Math.min(vw() - w - 8, v)); }
     function clampY(v, h) { return Math.max(8, Math.min(vh() - h - 8, v)); }
-    fab.addEventListener("pointerdown", function (e) {
-      if (e.button !== undefined && e.button !== 0) return;
-      var r = fab.getBoundingClientRect();
-      st = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, w: r.width, h: r.height, moved: false };
-      fab.style.transition = "none";
-      try { fab.setPointerCapture && fab.setPointerCapture(e.pointerId); } catch (_) {}
-    });
-    fab.addEventListener("pointermove", function (e) {
+    function onMove(e) {
       if (!st) return;
       var dx = e.clientX - st.sx, dy = e.clientY - st.sy;
       if (!st.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) st.moved = true;
@@ -371,8 +364,8 @@
       fab.style.top = (ny / vh() * 100) + "vh";
       fab.style.right = "auto";
       fab.style.bottom = "auto";
-    });
-    function finish(e) {
+    }
+    function onUp(e) {
       if (!st) return;
       var moved = st.moved;
       var r = fab.getBoundingClientRect();
@@ -388,15 +381,27 @@
         fab.style.right = "auto";
       }
       fab.style.top = (ny / vh() * 100) + "vh";
-      try { fab.releasePointerCapture && fab.releasePointerCapture(e.pointerId); } catch (_) {}
       st = null;
       if (moved) {
         fab.dataset.wucNoClick = "1";
         setTimeout(function () { fab.dataset.wucNoClick = "0"; }, 300);
       }
     }
-    fab.addEventListener("pointerup", finish);
-    fab.addEventListener("pointercancel", function () { st = null; });
+    fab.addEventListener("pointerdown", function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      var r = fab.getBoundingClientRect();
+      st = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, w: r.width, h: r.height, moved: false };
+      fab.style.transition = "none";
+      document.addEventListener("pointermove", onMove, true);
+      document.addEventListener("pointerup", onUp, true);
+      document.addEventListener("pointercancel", onCancel, true);
+    });
+    function onCancel() {
+      document.removeEventListener("pointermove", onMove, true);
+      document.removeEventListener("pointerup", onUp, true);
+      document.removeEventListener("pointercancel", onCancel, true);
+      st = null;
+    }
   }
 
   function openModal() {
