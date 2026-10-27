@@ -6,7 +6,7 @@
   "js": "index.js",
   "css": "style.css",
   "author": "luobo1002",
-  "version": "6.4.1",
+  "version": "6.4.2",
   "homePage": "https://github.com/luobo1002/wake-up-call",
   "auto_update": true
 }
